@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "asv_watcher"
+authors = [
+    {name = "Richard Shadrach", email = "rhshadrach@gmail.com"},
+]
+description = "ASV Performance Regression Detection"
+readme = "README.rst"
+requires-python = ">=3.7"
+keywords = ["ASV", "Performance", "Regression"]
+license = {text = "BSD-3-Clause"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "pandas",
+    "matplotlib",
+    "tqdm",
+]
+dynamic = ["version"]
+
+[tool.setuptools.dynamic]
+version = {file = "asv_watcher/VERSION"}
