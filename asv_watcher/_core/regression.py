@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+
 class Regression:
     def __init__(self, asv_name, asv_params, data, bad_hash, good_hash, plot_data):
         self._asv_name = asv_name

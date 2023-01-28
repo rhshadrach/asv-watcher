@@ -24,3 +24,18 @@ dynamic = ["version"]
 
 [tool.setuptools.dynamic]
 version = {file = "asv_watcher/VERSION"}
+
+[project.optional-dependencies]
+lint = [
+    "black",
+    "codespell",
+    "flake8",
+    "isort",
+    "mypy",
+    "pylint",
+    "pyright",
+    "pyupgrade",
+    "ruff",
+    "vulture",
+]
+dev = ["asv_watcher[lint]"]
