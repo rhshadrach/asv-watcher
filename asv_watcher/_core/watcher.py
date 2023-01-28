@@ -4,6 +4,7 @@ import itertools as it
 import json
 import urllib
 
+import matplotlib.pyplot as plt
 import pandas as pd
 from tqdm.notebook import tqdm
 
@@ -97,8 +98,6 @@ class Watcher:
         return result
 
     def generate_report(self, regressions: list[Regression]):
-        pd.options.plotting.backend = "plotly"
-
         for_report = {}
         for regression in regressions:
             for_report[regression._asv_name] = for_report.get(regression._asv_name, []) + [regression._asv_params]
@@ -138,37 +137,23 @@ class Watcher:
         print('---')
         print()
 
-        for benchmark, param_combos in for_report.items():
-            url = f'https://asv-runner.github.io/asv-collection/pandas/#{benchmark}'
-            for params in param_combos:
-                if params == '':
-                    print(url)
-                    continue
-                params_list = [param for param in params.split('; ')]
-                params_suffix = '?p-' + '&p-'.join(params_list)
-                url = f'https://asv-runner.github.io/asv-collection/pandas/#{benchmark}{params_suffix}'
-                url = urllib.parse.quote(url, safe='/:?=&#')
-                print(url)
-
-        count = 0
         for regression in regressions:
             key = regression._asv_name, regression._asv_params
-            count += 1
-            # if count >= 5:
-            #     break
             self.plot_benchmarks(key[0], key[1], regression._plot_data)
             offending_hash = regression._bad_hash
             good_hash = regression._good_hash
             url = f'https://github.com/pandas-dev/pandas/compare/{good_hash}...{offending_hash}'
             print(url)
             print()
-            break
 
     def plot_benchmarks(self, benchmark, param_combo, plot_data):
-        print(benchmark, param_combo)
-        print(f'https://asv-runner.github.io/asv-collection/pandas/#{benchmark}')
-        fig = plot_data.plot()
-        fig.show()
+        params_list = [param for param in param_combo.split('; ')]
+        params_suffix = '?p-' + '&p-'.join(params_list)
+        url = f'https://asv-runner.github.io/asv-collection/pandas/#{benchmark}{params_suffix}'
+        url = urllib.parse.quote(url, safe='/:?=&#')
+        print(url)
+        plot_data.plot()
+        plt.show()
 
 
 def read_json(path):
