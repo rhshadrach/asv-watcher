@@ -1,0 +1,37 @@
+name: Code Checks
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  pre_commit:
+    name: pre-commit
+    runs-on: ubuntu-22.04
+    concurrency:
+      # https://github.community/t/concurrecy-not-work-for-push/183068/7
+      group: ${{ github.event_name == 'push' && github.run_number || github.ref }}-pre-commit
+      cancel-in-progress: true
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Install Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: pip install .[lint]
+
+    - name: Run pre-commit
+      uses: pre-commit/action@v2.0.3
+      with:
+        extra_args: --verbose --all-files
