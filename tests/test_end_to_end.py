@@ -1,10 +1,12 @@
+import os
+
 from asv_watcher._core.detector import RollingDetector
 from asv_watcher._core.watcher import Watcher
 
 
 def test_end_to_end():
     detector = RollingDetector(window_size=5)
-    index_path = "data/index.json"
+    index_path = os.path.join(os.path.dirname(__file__), "data", "index.json")
 
     # TODO: Use index json graph_param_list
     import glob
