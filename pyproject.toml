@@ -38,4 +38,7 @@ lint = [
     "ruff",
     "vulture",
 ]
+test = [
+    "pytest",
+]
 dev = ["asv_watcher[lint]"]

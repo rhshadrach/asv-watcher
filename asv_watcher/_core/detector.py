@@ -17,6 +17,7 @@ class RollingDetector(Detector):
     def detect_regression(
         self, asv_name: str, asv_params: str, data: pd.DataFrame
     ) -> Regression | None:
+        data["revision"] = data["revision"].astype(int)
         data = data.sort_values("revision")
         times = data["time"].dropna()
         established_worst = (
