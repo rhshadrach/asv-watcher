@@ -4,7 +4,7 @@ from asv_watcher._core.watcher import Watcher
 
 def test_end_to_end():
     detector = RollingDetector(window_size=5)
-    index_path = "/home/richard/dev/asv-watcher-test-data/asv_bench/html/index.json"
+    index_path = "data/index.json"
 
     # TODO: Use index json graph_param_list
     import glob
@@ -12,7 +12,7 @@ def test_end_to_end():
 
     paths = set()
     for e in glob.glob(
-        "/home/richard/dev/asv-watcher-test-data/asv_bench/html/graphs/**",
+        "data/graphs/**",
         recursive=True,
     ):
         if "summary" in e:
