@@ -16,8 +16,9 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
-    "pandas",
+    "ipywidgets",
     "matplotlib",
+    "pandas",
     "tqdm",
 ]
 dynamic = ["version"]
@@ -37,5 +38,8 @@ lint = [
     "pyupgrade",
     "ruff",
     "vulture",
+]
+test = [
+    "pytest",
 ]
 dev = ["asv_watcher[lint]"]

@@ -30,10 +30,7 @@ class Watcher:
         self._processed_benchmarks = self.process_benchmarks(
             self._index_data["benchmarks"]
         )
-        self._mapper = self.identify_regressions(self._processed_benchmarks)
-
-    def run(self):
-        self.download_index_data()
+        self._mapper = self._identify_regressions(self._processed_benchmarks)
 
     def download_index_data(self):
         self._index_data = read_json(self._index_url)
@@ -97,7 +94,7 @@ class Watcher:
 
         return results
 
-    def identify_regressions(self, data):
+    def _identify_regressions(self, data):
         result = {}
         for (name, asv_params), data in data.items():
             regression = self._detector.detect_regression(name, asv_params, data)
@@ -105,6 +102,10 @@ class Watcher:
                 result[regression._bad_hash] = result.get(regression._bad_hash, []) + [
                     regression
                 ]
+        return result
+
+    def identify_regressions(self, ignored_hashes: dict[str:str]):
+        result = {k: v for k, v in self._mapper.items() if k not in ignored_hashes}
         return result
 
     def generate_report(self, regressions: list[Regression]):
