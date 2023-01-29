@@ -1,3 +1,4 @@
+import glob
 import os
 
 from asv_watcher._core.detector import RollingDetector
@@ -6,15 +7,13 @@ from asv_watcher._core.watcher import Watcher
 
 def test_end_to_end():
     detector = RollingDetector(window_size=5)
-    index_path = os.path.join(os.path.dirname(__file__), "data", "index.json")
+    base_path = os.path.join(os.path.dirname(__file__), "data")
+    index_path = os.path.join(base_path, "index.json")
 
     # TODO: Use index json graph_param_list
-    import glob
-    import os
-
     paths = set()
     for e in glob.glob(
-        "data/graphs/**",
+        os.path.join(base_path, "graphs", "**"),
         recursive=True,
     ):
         if "summary" in e:
