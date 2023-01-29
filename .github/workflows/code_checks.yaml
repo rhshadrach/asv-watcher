@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   pre_commit:
-    name: Tests
+    name: pre-commit
     runs-on: ubuntu-22.04
     concurrency:
       # https://github.community/t/concurrecy-not-work-for-push/183068/7
