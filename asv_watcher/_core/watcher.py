@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import urllib
 from pathlib import Path
+from typing import Any
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -33,7 +34,7 @@ class Watcher:
         )
         self._mapper = self._identify_regressions(self._processed_benchmarks)
 
-    def _determine_benchmark_prefixes(self):
+    def _determine_benchmark_prefixes(self) -> set[str]:
         # TODO: Use index json graph_param_list
         paths = set()
         for path in (self._benchmark_path / "graphs").glob("**/*.json"):
@@ -42,7 +43,9 @@ class Watcher:
             paths.add(path.parent)
         return paths
 
-    def _process_benchmarks(self, benchmarks) -> dict[tuple[str, str], pd.DataFrame]:
+    def _process_benchmarks(
+        self, benchmarks: dict[str, dict[str, Any]]
+    ) -> dict[tuple[str, str], pd.DataFrame]:
         results = {}
         for name, benchmark in benchmarks.items():
             parameter_collection = ParameterCollection(
