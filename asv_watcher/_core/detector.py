@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
+
 import pandas as pd
 
 from asv_watcher._core.regression import Regression
 
 
-class Detector:
-    pass
+class Detector(ABC):
+    @abstractmethod
+    def detect_regression(
+        self, asv_name: str, asv_params: str, data: pd.DataFrame
+    ) -> Regression | None:
+        raise NotImplementedError
 
 
 class RollingDetector(Detector):
