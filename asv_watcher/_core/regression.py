@@ -11,6 +11,8 @@ class Regression:
         data: pd.DataFrame,
         bad_hash: str,
         good_hash: str,
+        pct_change: float,
+        abs_change: float,
         plot_data: pd.DataFrame,
     ):
         self._asv_name = asv_name
@@ -18,4 +20,6 @@ class Regression:
         self._data = data
         self._bad_hash = bad_hash
         self._good_hash = good_hash
+        self._pct_change = pct_change
+        self._abs_change = abs_change
         self._plot_data = plot_data

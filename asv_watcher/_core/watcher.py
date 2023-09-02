@@ -115,6 +115,17 @@ class Watcher:
                 ]
         return result
 
+    def summary(self):
+        data = []
+        for k, v in self._mapper.items():
+            if k in self._ignored_hashes:
+                continue
+            for regression in v:
+                data.append([k, regression._asv_name, regression._asv_params, regression._pct_change, regression._abs_change])
+        result = pd.DataFrame(data, columns=['hash', 'name', 'params', 'pct_change', 'absolute_change'])
+        result = result.sort_values('pct_change', ascending=False)
+        return result
+
     def generate_report(self, regressions: list[Regression]) -> None:
         for_report = {}
         for regression in regressions:
@@ -162,11 +173,6 @@ class Watcher:
         for regression in regressions:
             key = regression._asv_name, regression._asv_params
             self.plot_benchmarks(key[0], key[1], regression._plot_data)
-            offending_hash = regression._bad_hash
-            good_hash = regression._good_hash
-            url = f"{base_url}{good_hash}...{offending_hash}"
-            print(url)
-            print()
 
     def plot_benchmarks(
         self, benchmark: str, param_combo: str, plot_data: pd.DataFrame
