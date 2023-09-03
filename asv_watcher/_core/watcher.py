@@ -47,7 +47,11 @@ class Watcher:
         self, benchmarks: dict[str, dict[str, Any]]
     ) -> dict[tuple[str, str], pd.DataFrame]:
         results = {}
+        count = 0
         for name, benchmark in benchmarks.items():
+            count += 1
+            if count > 800:
+                break
             parameter_collection = ParameterCollection(
                 benchmark["param_names"], benchmark["params"]
             )
@@ -126,36 +130,47 @@ class Watcher:
         result = result.sort_values('pct_change', ascending=False)
         return result
 
-    def generate_report(self, regressions: list[Regression]) -> None:
+    def commit_range(self, hash):
+        # TODO: Error checking if hash is here and list is non-empty
+        regression = self._mapper[hash][0]
+        offending_hash = regression._bad_hash
+        good_hash = regression._good_hash
+        base_url = "https://github.com/pandas-dev/pandas/compare/"
+        url = f"{base_url}{good_hash}...{offending_hash}"
+        return url
+
+    def generate_report(self, hash: str) -> str:
+        regressions = self._mapper[hash]
         for_report = {}
         for regression in regressions:
             for_report[regression._asv_name] = for_report.get(
                 regression._asv_name, []
             ) + [regression._asv_params]
-
-        print(
+        result = ""
+        result += (
             "This patch may have induced a potential regression. "
             "Please check the links below. If any ASVs are parameterized, "
             "the combinations of parameters that a regression has been detected "
             "appear as subbullets. This is a partially automated message.\n"
         )
 
-        print(
+        result += (
             "Subsequent benchmarks may have skipped some commits. See the link"
             " below to see which commits are"
             " between the two benchmark runs where the regression was identified.\n"
         )
 
-        offending_hash = regressions[0]._bad_hash
-        good_hash = regressions[0]._good_hash
-        base_url = "https://github.com/pandas-dev/pandas/compare/"
-        url = f"{base_url}{good_hash}...{offending_hash}"
-        print(url)
-        print()
+        # offending_hash = regressions[0]._bad_hash
+        # good_hash = regressions[0]._good_hash
+        # base_url = "https://github.com/pandas-dev/pandas/compare/"
+        # url = f"{base_url}{good_hash}...{offending_hash}"
+        result += self.commit_range(hash)
+        result += "\n"
 
         for benchmark, param_combos in for_report.items():
             base_url = "https://asv-runner.github.io/asv-collection/pandas/#"
-            print(f" - [{benchmark}]({url})")
+            url = f"{base_url}{benchmark}"
+            result += f" - [{benchmark}]({url})"
             for params in param_combos:
                 if params == "":
                     continue
@@ -163,16 +178,13 @@ class Watcher:
                 params_suffix = "?p-" + "&p-".join(params_list)
                 url = f"{base_url}{benchmark}{params_suffix}"
                 url = urllib.parse.quote(url, safe="/:?=&#")
-                print("   -", f"[{params}]({url})")
+                result += f"   - [{params}]({url})"
 
-        print()
-        print("---")
-        print()
+        return result
 
-        base_url = "https://github.com/pandas-dev/pandas/compare/"
-        for regression in regressions:
-            key = regression._asv_name, regression._asv_params
-            self.plot_benchmarks(key[0], key[1], regression._plot_data)
+        # for regression in regressions:
+        #     key = regression._asv_name, regression._asv_params
+        #     self.plot_benchmarks(key[0], key[1], regression._plot_data)
 
     def plot_benchmarks(
         self, benchmark: str, param_combo: str, plot_data: pd.DataFrame
