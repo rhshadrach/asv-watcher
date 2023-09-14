@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
+
 import pandas as pd
 
 from asv_watcher._core.regression import Regression
 
 
-class Detector:
-    pass
+class Detector(ABC):
+    @abstractmethod
+    def detect_regression(
+        self, asv_name: str, asv_params: str, data: pd.DataFrame
+    ) -> Regression | None:
+        raise NotImplementedError
 
 
 class RollingDetector(Detector):
@@ -47,6 +53,8 @@ class RollingDetector(Detector):
             ).idxmax()
             offending_hash = data.loc[loc].commit_hash
             good_hash = data.shift(1).loc[loc].commit_hash
+            pct_change = data["time"].loc[loc] / data["time"].shift(1).loc[loc]
+            abs_change = data["time"].loc[loc] - data["time"].shift(1).loc[loc]
             plot_data = (
                 pd.concat(
                     [
@@ -64,7 +72,14 @@ class RollingDetector(Detector):
                 .set_index("revision")
             )
             result = Regression(
-                asv_name, asv_params, data, offending_hash, good_hash, plot_data
+                asv_name,
+                asv_params,
+                data,
+                offending_hash,
+                good_hash,
+                pct_change,
+                abs_change,
+                plot_data,
             )
         else:
             result = None
