@@ -72,7 +72,14 @@ class RollingDetector(Detector):
                 .set_index("revision")
             )
             result = Regression(
-                asv_name, asv_params, data, offending_hash, good_hash, pct_change, abs_change, plot_data
+                asv_name,
+                asv_params,
+                data,
+                offending_hash,
+                good_hash,
+                pct_change,
+                abs_change,
+                plot_data,
             )
         else:
             result = None

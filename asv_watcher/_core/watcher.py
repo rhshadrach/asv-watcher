@@ -125,9 +125,21 @@ class Watcher:
             if k in self._ignored_hashes:
                 continue
             for regression in v:
-                data.append([k, regression._asv_name, regression._asv_params, regression._pct_change, regression._abs_change])
-        result = pd.DataFrame(data, columns=['hash', 'name', 'params', 'pct_change', 'absolute_change'])
-        result = result.sort_values('pct_change', ascending=False)
+                data.append(
+                    [
+                        k,
+                        regression._asv_name,
+                        regression._asv_params,
+                        regression._pct_change,
+                        regression._abs_change,
+                    ]
+                )
+        result = pd.DataFrame(
+            data, columns=["hash", "name", "params", "pct_change", "absolute_change"]
+        )
+        result = result.sort_values("pct_change", ascending=False).reset_index(
+            drop=True
+        )
         return result
 
     def commit_range(self, hash):
@@ -152,25 +164,23 @@ class Watcher:
             "Please check the links below. If any ASVs are parameterized, "
             "the combinations of parameters that a regression has been detected "
             "appear as subbullets. This is a partially automated message.\n"
+            "\n"
         )
 
         result += (
             "Subsequent benchmarks may have skipped some commits. See the link"
             " below to see which commits are"
             " between the two benchmark runs where the regression was identified.\n"
+            "\n"
         )
 
-        # offending_hash = regressions[0]._bad_hash
-        # good_hash = regressions[0]._good_hash
-        # base_url = "https://github.com/pandas-dev/pandas/compare/"
-        # url = f"{base_url}{good_hash}...{offending_hash}"
         result += self.commit_range(hash)
         result += "\n"
 
         for benchmark, param_combos in for_report.items():
             base_url = "https://asv-runner.github.io/asv-collection/pandas/#"
             url = f"{base_url}{benchmark}"
-            result += f" - [{benchmark}]({url})"
+            result += f" - [{benchmark}]({url})\n"
             for params in param_combos:
                 if params == "":
                     continue
@@ -178,13 +188,9 @@ class Watcher:
                 params_suffix = "?p-" + "&p-".join(params_list)
                 url = f"{base_url}{benchmark}{params_suffix}"
                 url = urllib.parse.quote(url, safe="/:?=&#")
-                result += f"   - [{params}]({url})"
+                result += f"   - [{params}]({url})\n"
 
         return result
-
-        # for regression in regressions:
-        #     key = regression._asv_name, regression._asv_params
-        #     self.plot_benchmarks(key[0], key[1], regression._plot_data)
 
     def plot_benchmarks(
         self, benchmark: str, param_combo: str, plot_data: pd.DataFrame

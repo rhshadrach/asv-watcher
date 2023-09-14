@@ -16,8 +16,10 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
+    "dash",
     "matplotlib",
     "pandas",
+    "plotly",
 ]
 dynamic = ["version"]
 
@@ -40,4 +42,4 @@ lint = [
 test = [
     "pytest",
 ]
-dev = ["asv_watcher[lint]"]
+dev = ["asv_watcher[lint, test]"]
