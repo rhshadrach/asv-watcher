@@ -70,7 +70,9 @@ watcher = Watcher(
 
 summary = watcher.summary()
 summary_by_hash = (
-    summary[summary.is_regression].reset_index().groupby("hash", as_index=False)
+    summary[summary.is_regression]
+    .reset_index()
+    .groupby("hash", as_index=False)
     .agg(
         benchmarks=("name", "size"),
         pct_change_max=("pct_change", "max"),
@@ -143,7 +145,6 @@ def update_github_comment(active_cell):
 def update_copy_github_comment(active_cell):
     if active_cell:
         hash = summary_by_hash.index[active_cell["row"]]
-        #     continue
         result = watcher.generate_report(hash)
         return result
     return ""
@@ -156,7 +157,11 @@ def update_commit_summary_table(active_cell):
     if active_cell:
         hash = summary_by_hash.index[active_cell["row"]]
         regressions = watcher.get_regressions(hash)
-        result = summary[summary["hash"].eq(hash) & summary.is_regression].reset_index().to_dict("records")
+        result = (
+            summary[summary["hash"].eq(hash) & summary.is_regression]
+            .reset_index()
+            .to_dict("records")
+        )
         return result
     return None
 
@@ -167,7 +172,9 @@ def update_commit_summary_table(active_cell):
 def update_plot(active_cell):
     if active_cell is not None and len(regressions) > 0:
         regression = regressions[active_cell["row"]]
-        plot_data = summary.loc[regression][['time', 'established_best', 'established_worst']]
+        plot_data = summary.loc[regression][
+            ["time", "established_best", "established_worst"]
+        ]
 
         fig = make_subplots()
         for column in plot_data:
