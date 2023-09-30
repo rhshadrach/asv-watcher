@@ -42,7 +42,7 @@ class RollingDetector(Detector):
             data["established_worst_cummin"] < tol * data["established_best_cummin_rev"]
         )
         mask = mask & ~mask.groupby(keys).shift(1, fill_value=False)
-        mask = mask.groupby(keys).shift(-self._window_size // 2, fill_value=False)
+        mask = mask.groupby(keys).shift(-(self._window_size - 1) // 2, fill_value=False)
 
         data["is_regression"] = mask
         data["pct_change"] = data.groupby(keys).time.pct_change()
