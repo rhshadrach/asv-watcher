@@ -5,12 +5,10 @@ import urllib
 from pathlib import Path
 from typing import Any
 
-import matplotlib.pyplot as plt
 import pandas as pd
 
 from asv_watcher._core.detector import Detector
 from asv_watcher._core.parameters import ParameterCollection
-from asv_watcher._core.regression import Regression
 
 
 class Watcher:
@@ -32,7 +30,7 @@ class Watcher:
         self._processed_benchmarks = self._process_benchmarks(
             self._index_data["benchmarks"]
         )
-        self._mapper = self._identify_regressions(self._processed_benchmarks)
+        self._data = self._detector.detect_regression(self._processed_benchmarks)
 
     def _determine_benchmark_prefixes(self) -> set[str]:
         # TODO: Use index json graph_param_list
@@ -102,75 +100,60 @@ class Watcher:
             else:
                 results[name, ""] = df
 
-        return results
+        data = {k: v[["revision", "time", "commit_hash"]] for k, v in results.items()}
+        data = pd.concat(data).rename(columns={"commit_hash": "hash"}).droplevel(-1)
+        data.index.names = ["name", "params"]
+        data["revision"] = data["revision"].astype(int)
+        data = data.set_index("revision", append=True).sort_index()
+        # I think this is due to different dependencies. We should maybe have
+        # dependencies as part of the index
+        result = data.groupby(["name", "params", "revision"]).agg(
+            {"time": "mean", "hash": "first"}
+        )
 
-    def _identify_regressions(
-        self, data: dict[tuple[str, str], pd.DataFrame]
-    ) -> dict[str, list[Regression]]:
-        result = {}
-        for (name, asv_params), df in data.items():
-            regression = self._detector.detect_regression(name, asv_params, df)
-            if (
-                regression is not None
-                and regression._bad_hash not in self._ignored_hashes
-            ):
-                result[regression._bad_hash] = result.get(regression._bad_hash, []) + [
-                    regression
-                ]
         return result
 
     def summary(self):
-        data = []
-        for k, v in self._mapper.items():
-            if k in self._ignored_hashes:
-                continue
-            for regression in v:
-                data.append(
-                    [
-                        k,
-                        regression._asv_name,
-                        regression._asv_params,
-                        regression._pct_change,
-                        regression._abs_change,
-                    ]
-                )
-        result = pd.DataFrame(
-            data, columns=["hash", "name", "params", "pct_change", "absolute_change"]
-        )
-        result = result.sort_values("pct_change", ascending=False).reset_index(
-            drop=True
-        )
-        return result
+        return self._data
 
     def commit_range(self, hash):
         # TODO: Error checking if hash is here and list is non-empty
-        regression = self._mapper[hash][0]
-        offending_hash = regression._bad_hash
-        good_hash = regression._good_hash
+        regression = self.get_regressions(hash)[0]
+        time_series = self._data.loc[regression]
+        prev_hash = time_series.shift(1)[time_series.hash == hash].hash.iloc[0]
         base_url = "https://github.com/pandas-dev/pandas/compare/"
-        url = f"{base_url}{good_hash}...{offending_hash}"
+        url = f"{base_url}{prev_hash}...{hash}"
         return url
 
+    def get_regressions(self, hash: str):
+        result = (
+            self._data[self._data["hash"].eq(hash) & self._data.is_regression]
+            .droplevel("revision")
+            .index.tolist()
+        )
+        return result
+
     def generate_report(self, hash: str) -> str:
-        regressions = self._mapper[hash]
+        regressions = self.get_regressions(hash)
         for_report = {}
         for regression in regressions:
-            for_report[regression._asv_name] = for_report.get(
-                regression._asv_name, []
-            ) + [regression._asv_params]
+            for_report[regression[0]] = for_report.get(regression[0], []) + [
+                regression[1]
+            ]
+
         result = ""
         result += (
             "This patch may have induced a potential regression. "
             "Please check the links below. If any ASVs are parameterized, "
             "the combinations of parameters that a regression has been detected "
-            "appear as subbullets. This is a partially automated message.\n"
+            "appear as subbullets. This is a partially automated message.\n\n"
             "\n"
         )
 
         result += (
             "Subsequent benchmarks may have skipped some commits. See the link"
             " below to see which commits are"
-            " between the two benchmark runs where the regression was identified.\n"
+            " between the two benchmark runs where the regression was identified.\n\n"
             "\n"
         )
 
@@ -191,18 +174,6 @@ class Watcher:
                 result += f"   - [{params}]({url})\n"
 
         return result
-
-    def plot_benchmarks(
-        self, benchmark: str, param_combo: str, plot_data: pd.DataFrame
-    ) -> None:
-        params_list = [param for param in param_combo.split("; ")]
-        params_suffix = "?p-" + "&p-".join(params_list)
-        base_url = "https://asv-runner.github.io/asv-collection/pandas/#"
-        url = f"{base_url}{benchmark}{params_suffix}"
-        url = urllib.parse.quote(url, safe="/:?=&#")
-        print(url)
-        plot_data.plot()
-        plt.show()
 
 
 def make_param_string(

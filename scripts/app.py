@@ -70,13 +70,15 @@ watcher = Watcher(
 
 summary = watcher.summary()
 summary_by_hash = (
-    summary.groupby("hash", as_index=False)
+    summary[summary.is_regression]
+    .reset_index()
+    .groupby("hash", as_index=False)
     .agg(
         benchmarks=("name", "size"),
         pct_change_max=("pct_change", "max"),
-        absolute_change_max=("absolute_change", "max"),
+        absolute_change_max=("abs_change", "max"),
         pct_change_mean=("pct_change", "mean"),
-        absolute_change_mean=("absolute_change", "mean"),
+        absolute_change_mean=("abs_change", "mean"),
     )
     .sort_values(by="benchmarks", ascending=False)
     .set_index("hash", drop=False)
@@ -109,7 +111,6 @@ app.layout = html.Div(
                 ),
             ]
         ),
-        html.P(id="github_comment"),
         dash_table.DataTable(
             id="commit_summary_table", data=pd.DataFrame().to_dict("records")
         ),
@@ -130,15 +131,6 @@ def update_commit_range(active_cell):
     return ""
 
 
-@app.callback(Output("github_comment", "children"), Input("summary", "active_cell"))
-def update_github_comment(active_cell):
-    if active_cell:
-        hash = summary_by_hash.index[active_cell["row"]]
-        result = html.Pre(watcher.generate_report(hash))
-        return result
-    return ""
-
-
 @app.callback(Output("copy_github_comment", "content"), Input("summary", "active_cell"))
 def update_copy_github_comment(active_cell):
     if active_cell:
@@ -154,8 +146,12 @@ def update_commit_summary_table(active_cell):
 
     if active_cell:
         hash = summary_by_hash.index[active_cell["row"]]
-        regressions = watcher._mapper[hash]
-        result = summary[summary["hash"] == hash].to_dict("records")
+        regressions = watcher.get_regressions(hash)
+        result = (
+            summary[summary["hash"].eq(hash) & summary.is_regression]
+            .reset_index()
+            .to_dict("records")
+        )
         return result
     return None
 
@@ -166,12 +162,12 @@ def update_commit_summary_table(active_cell):
 def update_plot(active_cell):
     if active_cell is not None and len(regressions) > 0:
         regression = regressions[active_cell["row"]]
-        plot_data = regression._plot_data
+        plot_data = summary.loc[regression][
+            ["time", "established_best", "established_worst"]
+        ]
 
         fig = make_subplots()
         for column in plot_data:
-            if column == "time":
-                continue
             fig.add_trace(
                 go.Scatter(
                     x=plot_data.eval("revision"),
