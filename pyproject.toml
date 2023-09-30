@@ -16,10 +16,8 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
-    "ipywidgets",
     "matplotlib",
     "pandas",
-    "tqdm",
 ]
 dynamic = ["version"]
 
@@ -33,6 +31,7 @@ lint = [
     "flake8",
     "isort",
     "mypy",
+    "pyarrow",
     "pylint",
     "pyright",
     "pyupgrade",
