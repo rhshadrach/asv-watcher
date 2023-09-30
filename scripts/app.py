@@ -111,7 +111,6 @@ app.layout = html.Div(
                 ),
             ]
         ),
-        html.P(id="github_comment"),
         dash_table.DataTable(
             id="commit_summary_table", data=pd.DataFrame().to_dict("records")
         ),
@@ -128,15 +127,6 @@ def update_commit_range(active_cell):
         hash = summary_by_hash.index[active_cell["row"]]
         commit_range = watcher.commit_range(hash)
         result = (html.A("Commit range", href=commit_range),)
-        return result
-    return ""
-
-
-@app.callback(Output("github_comment", "children"), Input("summary", "active_cell"))
-def update_github_comment(active_cell):
-    if active_cell:
-        hash = summary_by_hash.index[active_cell["row"]]
-        result = html.Pre(watcher.generate_report(hash))
         return result
     return ""
 
