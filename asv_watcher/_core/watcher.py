@@ -9,7 +9,6 @@ import pandas as pd
 
 from asv_watcher._core.detector import Detector
 from asv_watcher._core.parameters import ParameterCollection
-from asv_watcher._core.regression import Regression
 
 
 class Watcher:
@@ -112,21 +111,6 @@ class Watcher:
             {"time": "mean", "hash": "first"}
         )
 
-        return result
-
-    def _identify_regressions(
-        self, data: dict[tuple[str, str], pd.DataFrame]
-    ) -> dict[str, list[Regression]]:
-        result = {}
-        for (name, asv_params), df in data.items():
-            regression = self._detector.detect_regression(name, asv_params, df)
-            if (
-                regression is not None
-                and regression._bad_hash not in self._ignored_hashes
-            ):
-                result[regression._bad_hash] = result.get(regression._bad_hash, []) + [
-                    regression
-                ]
         return result
 
     def summary(self):
