@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import json
 import os
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
-import time
 
 import pandas as pd
 
@@ -53,7 +55,8 @@ def determine_benchmark_prefixes(benchmark_path: Path) -> set[Path]:
 
 
 def process_benchmarks(
-    benchmark_path: Path, window_size: int,
+    benchmark_path: Path,
+    window_size: int,
 ) -> pd.DataFrame:
     index_data = read_index_data(benchmark_path)
     benchmark_url_prefixes = determine_benchmark_prefixes(benchmark_path)
