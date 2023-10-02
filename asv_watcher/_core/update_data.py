@@ -4,6 +4,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 from typing import Any
+import time
 
 import pandas as pd
 
@@ -11,22 +12,34 @@ from asv_watcher import RollingDetector
 from asv_watcher._core.parameters import ParameterCollection
 
 
-def run(asv_collection_url):
+def run(asv_collection_url, write: bool = False, window_size: int = 30) -> pd.DataFrame:
     tmpdir = tempfile.TemporaryDirectory()
-    cmd = f"cd {tmpdir.name} && git clone {asv_collection_url} --depth 1 asv_collection"
-    import time
 
     timer = time.time()
+    cmd = f"cd {tmpdir.name} && git clone {asv_collection_url} --depth 1 asv_collection"
     subprocess.run(cmd, shell=True, capture_output=True, check=True)
     print(time.time() - timer)
+
     benchmark_path = Path(tmpdir.name) / "asv_collection" / "pandas"
+    benchmarks = process_benchmarks(benchmark_path)
+
+    if write:
+        cache_path = Path("../.cache/")
+        write_cache(cache_path, benchmarks)
+
+    return benchmarks
+
+
+def write_cache(path: Path, benchmarks: pd.DataFrame) -> None:
+    os.makedirs(path, exist_ok=True)
+    benchmarks.to_parquet(path / "benchmarks.parquet")
+
+
+def read_index_data(benchmark_path: Path) -> dict[str, dict[str, Any]]:
     index_path = benchmark_path / "index.json"
-    benchmark_url_prefixes = determine_benchmark_prefixes(benchmark_path)
     with open(index_path) as f:
-        index_data = json.load(f)
-    processed_benchmarks = process_benchmarks(index_data, benchmark_url_prefixes)
-    os.makedirs("../.cache/", exist_ok=True)
-    processed_benchmarks.to_parquet("../.cache/benchmarks.parquet")
+        result = json.load(f)
+    return result
 
 
 def determine_benchmark_prefixes(benchmark_path: Path) -> set[Path]:
@@ -40,9 +53,12 @@ def determine_benchmark_prefixes(benchmark_path: Path) -> set[Path]:
 
 
 def process_benchmarks(
-    index_data: dict[str, dict[str, Any]], benchmark_url_prefixes: set[Path]
-) -> dict[tuple[str, str], pd.DataFrame]:
+    benchmark_path: Path, window_size: int,
+) -> pd.DataFrame:
+    index_data = read_index_data(benchmark_path)
+    benchmark_url_prefixes = determine_benchmark_prefixes(benchmark_path)
     benchmarks = index_data["benchmarks"]
+
     results = {}
     for name, benchmark in benchmarks.items():
         parameter_collection = ParameterCollection(
@@ -108,7 +124,7 @@ def process_benchmarks(
         {"time": "mean", "hash": "first"}
     )
 
-    detector = RollingDetector(window_size=30)
+    detector = RollingDetector(window_size=window_size)
     result = detector.detect_regression(result)
 
     return result
@@ -126,8 +142,6 @@ def make_param_string(
 
 
 if __name__ == "__main__":
-    import time
-
     timer = time.time()
     run("https://github.com/asv-runner/asv-collection.git")
     print(time.time() - timer)
