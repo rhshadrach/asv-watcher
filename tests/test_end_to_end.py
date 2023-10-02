@@ -1,19 +1,16 @@
 import os
+from pathlib import Path
 
 import pandas as pd
 import pytest
 
-from asv_watcher._core.detector import RollingDetector
-from asv_watcher._core.watcher import Watcher
+from asv_watcher._core.update_data import process_benchmarks
 
 
 @pytest.mark.parametrize("window_size", [5, 6])
 def test_end_to_end(window_size):
-    detector = RollingDetector(window_size=window_size)
-    benchmark_path = os.path.join(os.path.dirname(__file__), "data")
-    watcher = Watcher(detector=detector, benchmark_path=benchmark_path)
-
-    summary = watcher.summary()
+    benchmark_path = Path(os.path.dirname(__file__)) / "data"
+    summary = process_benchmarks(benchmark_path, window_size=window_size)
     result = summary[summary.is_regression][[]]
     expected = pd.DataFrame(
         {

@@ -4,70 +4,9 @@ import plotly.graph_objects as go
 from dash import Dash, Input, Output, dash_table, dcc, html
 from plotly.subplots import make_subplots
 
-from asv_watcher import RollingDetector, Watcher
+from asv_watcher import Watcher
 
-detector = RollingDetector(window_size=30)
-benchmark_path = "/home/richard/dev/asv-collection/pandas"
-ignored_hashes = {
-    "253daaa1a67918f5d71956282a29a14adf74bae7": (
-        "Revert Vendored klib quadatric probing - performance improvements due to other"
-        " regressions"
-    ),
-    "b7708f00c7b61990521e9a0e03680ed45b59086b": (
-        "Posted comment, haven't raised an issue"
-    ),
-    "05fb08ecca8850b71f659788183b48db9bc4e391": (
-        "Change in NumPy caused performance differences"
-    ),
-    "8b227f39cecc170ab2a14eaa1d6e349ba59528bf": (
-        "GH#49920 - Posted comment, haven't raised an issue"
-    ),
-    "0a58c03f5dfe643a9ef7ad54bead679a82d2e63b": (
-        "GH#49684 - Posted comment, haven't raised an issue"
-    ),
-    "3b901a4143d2263bbc7fc5076f040eb70166ff92": (
-        "GH#48176 - Regression fix that adds a copy"
-    ),
-    "f6d3cb292e50e77e7cb624ea33167f943c5a2481": (
-        "GH#49624 - Posted comment, haven't raised an issue"
-    ),
-    "27138738a22edeaa644a3aff1a2cd98d1f954632": "GH#49566 - Already commented on in PR",
-    "ef23fc75b2adfffd0d82a75f6be8f87fb00a5892": (
-        "GH#49466 - Posted comment, haven't raised an issue"
-    ),
-    "0106c26529900bad0561efb9c9180f7f016365b0": (
-        "GH#49053 - Revert of caching since it breaks find_stack_level"
-    ),
-    "c0445543a10ae6c6abe5a3efc519fd9edcd2d276": (
-        "GH#49589 - Posted comment, haven't raised an issue"
-    ),
-    "d47e052379826ab6085e145e6ee2c654b0d1c471": (
-        "GH#49490 - Behavior change in groupby group_keys"
-    ),
-    "f19aeaf4976228ed936e9cc85b6f430ab72c1793": "GH#49873 - ASVs discussed in PR",
-    "6b4fa02e10480c4ddae0714e36b7fe765fa42eac": (
-        "GH#49347 - Small regression, not informed"
-    ),
-    "b77417832c76f0027723cad68ffd5654bbafe2a9": "GH#49378 - Posted comment",
-    # TODO: We should altomatically ignore change in dependencies
-    "2d6d744f9702b94a616890edc1543ac9bd246e49": (
-        "GH#50653 - False positive, change in NumPy"
-    ),
-    "eff6566cdcc99b41234e0577ab92b779348695ac": (
-        "GH#49737 - Expected due to behavior change"
-    ),
-    "1d5f05c33c613508727ee7b971ad56723d474446": "GH#49024 - Expected behavior change",
-    "4f42ecbd0569f645a881f15527709e2069c6672d": "GH#50548 - Expected behavior change",
-    "3ea04c383bec5aa82a1f2c57c6d4da81ebd74755": "GH#50507 - Expected behavior change",
-    "98323eec0e94ea103412a1a20a1e6b4c6fa0599b": "GH#49008 - Expected behavior change",
-}
-
-watcher = Watcher(
-    detector=detector,
-    benchmark_path=benchmark_path,
-    ignored_hashes=ignored_hashes,
-)
-
+watcher = Watcher()
 summary = watcher.summary()
 summary_by_hash = (
     summary[summary.is_regression]

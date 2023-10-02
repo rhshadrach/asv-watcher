@@ -33,6 +33,7 @@ lint = [
     "flake8",
     "isort",
     "mypy",
+    "pyarrow",
     "pylint",
     "pyright",
     "pyupgrade",
