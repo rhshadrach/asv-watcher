@@ -1,37 +1,29 @@
-import glob
 import os
+
+import pandas as pd
+import pytest
 
 from asv_watcher._core.detector import RollingDetector
 from asv_watcher._core.watcher import Watcher
 
 
-def test_end_to_end():
-    detector = RollingDetector(window_size=5)
-    base_path = os.path.join(os.path.dirname(__file__), "data")
-    index_path = os.path.join(base_path, "index.json")
+@pytest.mark.parametrize("window_size", [5, 6])
+def test_end_to_end(window_size):
+    detector = RollingDetector(window_size=window_size)
+    benchmark_path = os.path.join(os.path.dirname(__file__), "data")
+    watcher = Watcher(detector=detector, benchmark_path=benchmark_path)
 
-    # TODO: Use index json graph_param_list
-    paths = set()
-    for e in glob.glob(
-        os.path.join(base_path, "graphs", "**"),
-        recursive=True,
-    ):
-        if "summary" in e:
-            continue
-        if not e.endswith(".json"):
-            continue
-        paths.add(os.path.split(e)[0])
-
-    benchmark_url_prefixes = tuple(paths)
-    watcher = Watcher(
-        detector=detector,
-        index_path=index_path,
-        benchmark_url_prefixes=benchmark_url_prefixes,
-    )
-
-    regressions = watcher.identify_regressions(ignored_hashes={})
-    assert len(regressions) == 1
-    results = regressions[next(iter(regressions.keys()))]
-    for result in results:
-        revision = watcher._hash_to_revision[result._bad_hash]
-        assert revision == "22"
+    summary = watcher.summary()
+    result = summary[summary.is_regression][[]]
+    expected = pd.DataFrame(
+        {
+            "name": [
+                "benchmarks.Benchmark.time_standard_regression",
+                "benchmarks.BenchmarkWithParameter.time_standard_regression_parametrized",
+                "benchmarks.BenchmarkWithParameter.time_standard_regression_parametrized",
+            ],
+            "params": ["", "x=0.001", "x=0.002"],
+            "revision": 22,
+        }
+    ).set_index(["name", "params", "revision"])
+    pd.testing.assert_frame_equal(result, expected)
