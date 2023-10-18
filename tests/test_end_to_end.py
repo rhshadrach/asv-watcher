@@ -24,5 +24,4 @@ def test_end_to_end(window_size):
             "revision": 22,
         }
     ).set_index(["name", "params", "date", "revision"])
-    print(result.to_string())
     pd.testing.assert_frame_equal(result, expected)
