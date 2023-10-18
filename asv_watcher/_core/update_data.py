@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import json
 import os
 import subprocess
@@ -9,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+import pytz
 
 from asv_watcher import RollingDetector
 from asv_watcher._core.parameters import ParameterCollection
@@ -23,10 +25,10 @@ def run(asv_collection_url, write: bool = False, window_size: int = 30) -> pd.Da
     print(time.time() - timer)
 
     benchmark_path = Path(tmpdir.name) / "asv_collection" / "pandas"
-    benchmarks = process_benchmarks(benchmark_path)
+    benchmarks = process_benchmarks(benchmark_path, window_size)
 
     if write:
-        cache_path = Path("../.cache/")
+        cache_path = Path(__file__).parent / ".." / ".." / ".cache"
         write_cache(cache_path, benchmarks)
 
     return benchmarks
@@ -61,6 +63,7 @@ def process_benchmarks(
     index_data = read_index_data(benchmark_path)
     benchmark_url_prefixes = determine_benchmark_prefixes(benchmark_path)
     benchmarks = index_data["benchmarks"]
+    revision_to_date = index_data["revision_to_date"]
 
     results = {}
     for name, benchmark in benchmarks.items():
@@ -100,6 +103,10 @@ def process_benchmarks(
             ):
                 data_inner = param_combo.to_dict()
                 data_inner["revision"] = str(revision)
+                date = revision_to_date.get(str(revision), pd.NaT)
+                if not pd.isna(date):
+                    date = datetime.datetime.fromtimestamp(date / 1000.0, tz=pytz.utc)
+                data_inner["date"] = date
                 data_inner["time"] = seconds
                 data.append(data_inner)
         if len(data) == 0:
@@ -116,14 +123,16 @@ def process_benchmarks(
         else:
             results[name, ""] = df
 
-    data = {k: v[["revision", "time", "commit_hash"]] for k, v in results.items()}
+    data = {
+        k: v[["revision", "date", "time", "commit_hash"]] for k, v in results.items()
+    }
     data = pd.concat(data).rename(columns={"commit_hash": "hash"}).droplevel(-1)
     data.index.names = ["name", "params"]
     data["revision"] = data["revision"].astype(int)
     data = data.set_index("revision", append=True).sort_index()
     # I think this is due to different dependencies. We should maybe have
     # dependencies as part of the index
-    result = data.groupby(["name", "params", "revision"]).agg(
+    result = data.groupby(["name", "params", "date", "revision"], dropna=False).agg(
         {"time": "mean", "hash": "first"}
     )
 
@@ -145,6 +154,7 @@ def make_param_string(
 
 
 if __name__ == "__main__":
+    print(__file__)
     timer = time.time()
-    run("https://github.com/asv-runner/asv-collection.git")
+    run("https://github.com/asv-runner/asv-collection.git", write=True)
     print(time.time() - timer)
