@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+import pytz
 
 from asv_watcher import RollingDetector
 from asv_watcher._core.parameters import ParameterCollection
@@ -104,7 +105,7 @@ def process_benchmarks(
                 data_inner["revision"] = str(revision)
                 date = revision_to_date.get(str(revision), pd.NaT)
                 if not pd.isna(date):
-                    date = datetime.datetime.fromtimestamp(date / 1000.0)
+                    date = datetime.datetime.fromtimestamp(date / 1000.0, tz=pytz.utc)
                 data_inner["date"] = date
                 data_inner["time"] = seconds
                 data.append(data_inner)

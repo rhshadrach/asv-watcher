@@ -20,7 +20,7 @@ def test_end_to_end(window_size):
                 "benchmarks.BenchmarkWithParameter.time_standard_regression_parametrized",
             ],
             "params": ["", "x=0.001", "x=0.002"],
-            "date": pd.to_datetime("2023-01-28 21:14:40"),
+            "date": pd.to_datetime("2023-01-29 02:14:40", utc=True),
             "revision": 22,
         }
     ).set_index(["name", "params", "date", "revision"])
