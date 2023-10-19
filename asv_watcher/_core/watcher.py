@@ -29,7 +29,7 @@ class Watcher:
     def get_regressions(self, hash: str):
         result = (
             self._data[self._data["hash"].eq(hash) & self._data.is_regression]
-            .droplevel(["date", "revision"])
+            .droplevel(["revision"])
             .index.tolist()
         )
         return result

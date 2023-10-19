@@ -13,13 +13,14 @@ summary_by_hash = (
     .reset_index()
     .groupby("hash", as_index=False)
     .agg(
+        date=("date", "first"),
         benchmarks=("name", "size"),
         pct_change_max=("pct_change", "max"),
         absolute_change_max=("abs_change", "max"),
         pct_change_mean=("pct_change", "mean"),
         absolute_change_mean=("abs_change", "mean"),
     )
-    .sort_values(by="benchmarks", ascending=False)
+    .sort_values(by="date", ascending=False)
     .set_index("hash", drop=False)
 )
 
@@ -29,7 +30,7 @@ app = Dash(__name__)
 # App layout
 app.layout = html.Div(
     [
-        html.Div(children="My First App with Data"),
+        html.Div(children="Regression Navigator"),
         dash_table.DataTable(
             id="summary",
             data=summary_by_hash.to_dict("records"),
@@ -102,18 +103,20 @@ def update_plot(active_cell):
     if active_cell is not None and len(regressions) > 0:
         regression = regressions[active_cell["row"]]
         plot_data = summary.loc[regression][
-            ["time", "established_best", "established_worst"]
+            ["date", "time", "established_best", "established_worst", "is_regression"]
         ]
 
-        fig = make_subplots()
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
         for column in plot_data:
+            if column == "date":
+                continue
             fig.add_trace(
                 go.Scatter(
                     x=plot_data.eval("revision"),
                     y=plot_data[column],
                     name=column,
                 ),
-                secondary_y=False,
+                secondary_y=column == "is_regression",
             )
         return fig
     return dash.no_update

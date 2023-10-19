@@ -16,7 +16,7 @@ class RollingDetector(Detector):
         self._window_size = window_size
 
     def detect_regression(self, data: pd.DataFrame) -> pd.DataFrame:
-        data = data[data.time.notnull()].copy()
+        data = data[data.time.notnull()].sort_values("revision")
         keys = ["name", "params"]
         gb = data.groupby(keys)
         tol = 0.95
@@ -37,7 +37,9 @@ class RollingDetector(Detector):
         )
 
         mask = (
-            data["established_worst_cummin"] < tol * data["established_best_cummin_rev"]
+            # TODO: is the arg to shift right?
+            data["established_worst"].groupby(keys).shift(self._window_size)
+            < tol * data["established_best"]
         )
         mask = mask & ~mask.groupby(keys).shift(1, fill_value=False)
         mask = mask.groupby(keys).shift(-(self._window_size - 1) // 2, fill_value=False)
