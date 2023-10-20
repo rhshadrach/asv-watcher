@@ -103,7 +103,7 @@ repos:
     -   id: mypy
         # note: assumes python env is setup and activated
         name: mypy
-        entry: mypy
+        entry: mypy asv_watcher
         language: system
         pass_filenames: false
         types: [python]
