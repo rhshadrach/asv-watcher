@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import urllib
+import urllib.parse
 from pathlib import Path
 
 import pandas as pd
@@ -28,7 +28,7 @@ class Watcher:
         url = f"{base_url}{prev_hash}...{hash}"
         return url
 
-    def get_regressions(self, hash: str):
+    def get_regressions(self, hash: str) -> list[tuple[str, str]]:
         result = (
             self._data[self._data["hash"].eq(hash) & self._data.is_regression]
             .droplevel(["revision"])
@@ -38,7 +38,7 @@ class Watcher:
 
     def generate_report(self, hash: str) -> str:
         regressions = self.get_regressions(hash)
-        for_report = {}
+        for_report: dict[str, list[str]] = {}
         for regression in regressions:
             for_report[regression[0]] = for_report.get(regression[0], []) + [
                 regression[1]

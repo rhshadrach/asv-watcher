@@ -104,9 +104,10 @@ repos:
         # note: assumes python env is setup and activated
         name: mypy
         entry: mypy asv_watcher
-        language: system
+        language: python
         pass_filenames: false
         types: [python]
+        require_serial: true
     -   id: flake8-rst
         name: flake8-rst
         description: Run flake8 on code snippets in docstrings or RST files
