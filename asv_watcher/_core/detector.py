@@ -18,7 +18,6 @@ class RollingDetector(Detector):
     def detect_regression(self, data: pd.DataFrame) -> pd.DataFrame:
         data = data[data.time.notnull()].sort_values("revision")
         keys = ["name", "params"]
-        gb = data.groupby(keys)
         tol = 0.95
 
         data["established_worst"] = (

@@ -11,7 +11,7 @@ from asv_watcher._core.update_data import process_benchmarks
 def test_end_to_end(window_size):
     benchmark_path = Path(os.path.dirname(__file__)) / "data"
     summary = process_benchmarks(benchmark_path, window_size=window_size)
-    result = summary[summary.is_regression][["date"]]
+    result = summary[summary.is_regression][["date"]].sort_index()
     expected = pd.DataFrame(
         {
             "name": [

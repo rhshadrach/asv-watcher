@@ -12,7 +12,9 @@ class Watcher:
     def __init__(
         self,
     ) -> None:
-        self._data = pd.read_parquet(BASEDIR / ".cache" / "benchmarks.parquet").sort_index()
+        self._data = pd.read_parquet(
+            BASEDIR / ".cache" / "benchmarks.parquet"
+        ).sort_index()
 
     def summary(self):
         return self._data
