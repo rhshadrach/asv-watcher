@@ -107,7 +107,6 @@ repos:
         language: system
         pass_filenames: false
         types: [python]
-        stages: [manual]
     -   id: flake8-rst
         name: flake8-rst
         description: Run flake8 on code snippets in docstrings or RST files
