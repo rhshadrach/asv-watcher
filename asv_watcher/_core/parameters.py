@@ -15,4 +15,8 @@ class Parameters:
 
 class ParameterCollection:
     def __init__(self, names: list[str], values: list[str]):
-        self._params = [Parameters(names, v) for v in it.product(*values)]
+        self._params = [
+            # mypy doesn't understand that v is a tuple of strings
+            Parameters(names, v)  # type: ignore[arg-type]
+            for v in it.product(*values)
+        ]

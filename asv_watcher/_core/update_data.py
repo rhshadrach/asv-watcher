@@ -74,7 +74,7 @@ def process_benchmarks(
         buffer = []
         for prefix in benchmark_url_prefixes:
             # TODO: Use Path object
-            benchmark_path = f"{prefix}/{name}.json"
+            benchmark_path = Path(prefix) / f"{name}.json"
             try:
                 with open(benchmark_path) as f:
                     buffer.append(json.load(f))
@@ -82,37 +82,17 @@ def process_benchmarks(
                 # TODO: Why does this happen?
                 # print(f"Error in reading {benchmark_path}")
                 continue
-        json_data = sum(buffer, [])
+        json_data: list[str] = sum(buffer, [])
         if len(json_data) == 0:
             # TODO: Why does this happen?
             # print(benchmark, "has no data. Skipping.")
             continue
 
-        revisions, times = list(zip(*json_data))
-
-        data = []
-        for revision, revision_times in zip(revisions, times):
-            if revision_times is None:
-                # TODO: Not sure why this happens...
-                continue
-            elif isinstance(revision_times, float):
-                # Benchmark has no arguments
-                revision_times = [revision_times]
-            for param_combo, seconds in zip(
-                parameter_collection._params, revision_times
-            ):
-                data_inner = param_combo.to_dict()
-                data_inner["revision"] = str(revision)
-                date = revision_to_date.get(str(revision), pd.NaT)
-                if not pd.isna(date):
-                    date = datetime.datetime.fromtimestamp(date / 1000.0, tz=pytz.utc)
-                data_inner["date"] = date
-                data_inner["time"] = seconds
-                data.append(data_inner)
-        if len(data) == 0:
+        df = extract_benchmark_data(
+            json_data, parameter_collection, revision_to_date, index_data
+        )
+        if df.empty:
             continue
-        df = pd.DataFrame(data)
-        df["commit_hash"] = df["revision"].map(index_data["revision_to_hash"])
 
         param_names = benchmark["param_names"]
         if len(param_names) > 0:
@@ -123,10 +103,16 @@ def process_benchmarks(
         else:
             results[name, ""] = df
 
-    data = {
-        k: v[["revision", "date", "time", "commit_hash"]] for k, v in results.items()
-    }
-    data = pd.concat(data).rename(columns={"commit_hash": "hash"}).droplevel(-1)
+    data = (
+        pd.concat(
+            {
+                k: v[["revision", "date", "time", "commit_hash"]]
+                for k, v in results.items()
+            }
+        )
+        .rename(columns={"commit_hash": "hash"})
+        .droplevel(-1)
+    )
     data.index.names = ["name", "params"]
     data["revision"] = data["revision"].astype(int)
     data = data.set_index("revision", append=True).sort_index()
@@ -140,6 +126,36 @@ def process_benchmarks(
     result = detector.detect_regression(result)
 
     return result
+
+
+def extract_benchmark_data(
+    json_data, parameter_collection, revision_to_date, index_data
+):
+    revisions, times = list(zip(*json_data))
+
+    data = []
+    for revision, revision_times in zip(revisions, times):
+        if revision_times is None:
+            # TODO: Not sure why this happens...
+            continue
+        elif isinstance(revision_times, float):
+            # Benchmark has no arguments
+            revision_times = [revision_times]
+        for param_combo, seconds in zip(parameter_collection._params, revision_times):
+            data_inner = param_combo.to_dict()
+            data_inner["revision"] = str(revision)
+            date = revision_to_date.get(str(revision), pd.NaT)
+            if not pd.isna(date):
+                date = datetime.datetime.fromtimestamp(date / 1000.0, tz=pytz.utc)
+            data_inner["date"] = date
+            data_inner["time"] = seconds
+            data.append(data_inner)
+    if len(data) == 0:
+        # TODO: Why does this happen?
+        return pd.DataFrame()
+    df = pd.DataFrame(data)
+    df["commit_hash"] = df["revision"].map(index_data["revision_to_hash"])
+    return df
 
 
 def make_param_string(
