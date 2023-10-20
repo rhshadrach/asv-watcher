@@ -31,10 +31,6 @@ class RollingDetector(Detector):
             .rolling(self._window_size, center=True)
             .min()[["time"]]
         )
-        data["established_worst_cummin"] = gb["established_worst"].cummin()
-        data["established_best_cummin_rev"] = (
-            data["established_best"][::-1].groupby(keys).cummin()[::-1]
-        )
 
         mask = (
             # TODO: is the arg to shift right?

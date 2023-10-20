@@ -5,6 +5,7 @@ from dash import Dash, Input, Output, dash_table, dcc, html
 from plotly.subplots import make_subplots
 
 from asv_watcher import Watcher
+from asv_watcher._core import util
 
 watcher = Watcher()
 summary = watcher.summary()
@@ -16,13 +17,25 @@ summary_by_hash = (
         date=("date", "first"),
         benchmarks=("name", "size"),
         pct_change_max=("pct_change", "max"),
-        absolute_change_max=("abs_change", "max"),
+        abs_change_max=("abs_change", "max"),
         pct_change_mean=("pct_change", "mean"),
-        absolute_change_mean=("abs_change", "mean"),
+        abs_change_mean=("abs_change", "mean"),
     )
     .sort_values(by="date", ascending=False)
     .set_index("hash", drop=False)
+    [['date', 'benchmarks', 'pct_change_max', 'abs_change_max', 'pct_change_mean', 'abs_change_mean', 'hash']]
 )
+summary['pct_change'] = summary['pct_change'].apply(lambda x: f'{x:0.3%}')
+for c in ['pct_change_max', 'pct_change_mean']:
+    summary_by_hash[c] = summary_by_hash[c].apply(lambda x: f'{x:0.3%}')
+
+summary['time_float'] = summary['time']
+summary['time'] = summary['time'].apply(util.time_to_str)
+summary['abs_change'] = summary['abs_change'].apply(util.time_to_str)
+for c in ['abs_change_max', 'abs_change_mean']:
+    summary_by_hash[c] = summary_by_hash[c].apply(util.time_to_str)
+
+
 
 # Initialize the app
 app = Dash(__name__)
@@ -52,7 +65,7 @@ app.layout = html.Div(
             ]
         ),
         dash_table.DataTable(
-            id="commit_summary_table", data=pd.DataFrame().to_dict("records")
+            id="commit_table", data=pd.DataFrame().to_dict("records")
         ),
         dcc.Graph(id="benchmark_plot", figure={}),
     ]
@@ -80,8 +93,8 @@ def update_copy_github_comment(active_cell):
     return ""
 
 
-@app.callback(Output("commit_summary_table", "data"), Input("summary", "active_cell"))
-def update_commit_summary_table(active_cell):
+@app.callback(Output("commit_table", "data"), Input("summary", "active_cell"))
+def update_commit_table(active_cell):
     global regressions
 
     if active_cell:
@@ -90,6 +103,7 @@ def update_commit_summary_table(active_cell):
         result = (
             summary[summary["hash"].eq(hash) & summary.is_regression]
             .reset_index()
+            [['name', 'params', 'pct_change', 'abs_change', 'time']]
             .to_dict("records")
         )
         return result
@@ -97,14 +111,14 @@ def update_commit_summary_table(active_cell):
 
 
 @app.callback(
-    Output("benchmark_plot", "figure"), Input("commit_summary_table", "active_cell")
+    Output("benchmark_plot", "figure"), Input("commit_table", "active_cell")
 )
 def update_plot(active_cell):
     if active_cell is not None and len(regressions) > 0:
         regression = regressions[active_cell["row"]]
         plot_data = summary.loc[regression][
-            ["date", "time", "established_best", "established_worst", "is_regression"]
-        ]
+            ["date", "time_float", "established_best", "established_worst", "is_regression"]
+        ].rename(columns={'time_float': 'time'})
 
         fig = make_subplots(specs=[[{"secondary_y": True}]])
         for column in plot_data:
