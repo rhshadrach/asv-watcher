@@ -132,8 +132,8 @@ def process_benchmarks(
     data = data.set_index("revision", append=True).sort_index()
     # I think this is due to different dependencies. We should maybe have
     # dependencies as part of the index
-    result = data.groupby(["name", "params", "date", "revision"], dropna=False).agg(
-        {"time": "mean", "hash": "first"}
+    result = data.groupby(["name", "params", "revision"], dropna=False).agg(
+        {"time": "mean", "hash": "first", "date": "first"}
     )
 
     detector = RollingDetector(window_size=window_size)
@@ -154,7 +154,6 @@ def make_param_string(
 
 
 if __name__ == "__main__":
-    print(__file__)
     timer = time.time()
     run("https://github.com/asv-runner/asv-collection.git", write=True)
     print(time.time() - timer)

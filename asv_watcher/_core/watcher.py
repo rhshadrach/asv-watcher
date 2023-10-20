@@ -12,7 +12,9 @@ class Watcher:
     def __init__(
         self,
     ) -> None:
-        self._data = pd.read_parquet(BASEDIR / ".cache" / "benchmarks.parquet")
+        self._data = pd.read_parquet(
+            BASEDIR / ".cache" / "benchmarks.parquet"
+        ).sort_index()
 
     def summary(self):
         return self._data
@@ -29,7 +31,7 @@ class Watcher:
     def get_regressions(self, hash: str):
         result = (
             self._data[self._data["hash"].eq(hash) & self._data.is_regression]
-            .droplevel(["date", "revision"])
+            .droplevel(["revision"])
             .index.tolist()
         )
         return result
@@ -44,22 +46,15 @@ class Watcher:
 
         result = ""
         result += (
-            "This patch may have induced a potential regression. "
+            "This patch may have induced a performance regression. "
+            "If it was a necessary behavior change, this may have been "
+            "expected and everything is okay."
+            "\n\n"
             "Please check the links below. If any ASVs are parameterized, "
             "the combinations of parameters that a regression has been detected "
-            "appear as subbullets. This is a partially automated message.\n\n"
-            "\n"
+            "for appear as subbullets."
+            "\n\n"
         )
-
-        result += (
-            "Subsequent benchmarks may have skipped some commits. See the link"
-            " below to see which commits are"
-            " between the two benchmark runs where the regression was identified.\n\n"
-            "\n"
-        )
-
-        result += self.commit_range(hash)
-        result += "\n"
 
         for benchmark, param_combos in for_report.items():
             base_url = "https://asv-runner.github.io/asv-collection/pandas/#"
@@ -73,5 +68,16 @@ class Watcher:
                 url = f"{base_url}{benchmark}{params_suffix}"
                 url = urllib.parse.quote(url, safe="/:?=&#")
                 result += f"   - [{params}]({url})\n"
+        result += "\n"
+
+        result += (
+            "Subsequent benchmarks may have skipped some commits. The link"
+            " below lists the commits that are"
+            " between the two benchmark runs where the regression was identified."
+            "\n\n"
+        )
+
+        result += self.commit_range(hash)
+        result += "\n"
 
         return result

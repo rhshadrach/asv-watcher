@@ -43,4 +43,4 @@ lint = [
 test = [
     "pytest",
 ]
-dev = ["asv_watcher[lint, test]"]
+dev = ["asv_watcher[lint, test]", "pre-commit"]
