@@ -16,10 +16,10 @@ class Watcher:
             BASEDIR / ".cache" / "benchmarks.parquet"
         ).sort_index()
 
-    def summary(self):
+    def summary(self) -> pd.DataFrame:
         return self._data
 
-    def commit_range(self, hash):
+    def commit_range(self, hash: str) -> str:
         # TODO: Error checking if hash is here and list is non-empty
         regression = self.get_regressions(hash)[0]
         time_series = self._data.loc[regression]

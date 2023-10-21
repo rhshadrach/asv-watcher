@@ -45,6 +45,12 @@ test = [
 ]
 dev = ["asv_watcher[lint, test]", "pre-commit"]
 
+[tool.mypy]
+disallow_untyped_defs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_unreachable = true
+
 [[tool.mypy.overrides]]
 module = ["pandas", "pytz"]
 ignore_missing_imports = true

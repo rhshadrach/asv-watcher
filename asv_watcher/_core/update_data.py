@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 import pytz
@@ -16,7 +16,9 @@ from asv_watcher import RollingDetector
 from asv_watcher._core.parameters import ParameterCollection
 
 
-def run(asv_collection_url, write: bool = False, window_size: int = 30) -> pd.DataFrame:
+def run(
+    asv_collection_url: str, write: bool = False, window_size: int = 30
+) -> pd.DataFrame:
     tmpdir = tempfile.TemporaryDirectory()
 
     timer = time.time()
@@ -129,8 +131,11 @@ def process_benchmarks(
 
 
 def extract_benchmark_data(
-    json_data, parameter_collection, revision_to_date, index_data
-):
+    json_data: list[str],
+    parameter_collection: ParameterCollection,
+    revision_to_date: dict[str, float],
+    index_data: dict[str, Any],
+) -> pd.DataFrame:
     revisions, times = list(zip(*json_data))
 
     data = []
@@ -142,14 +147,20 @@ def extract_benchmark_data(
             # Benchmark has no arguments
             revision_times = [revision_times]
         for param_combo, seconds in zip(parameter_collection._params, revision_times):
-            data_inner = param_combo.to_dict()
-            data_inner["revision"] = str(revision)
+            # dict is invariant and we want to add different dtypes to the values
+            row = cast(
+                dict[str, str | datetime.datetime | float], param_combo.to_dict()
+            )
+            row["revision"] = str(revision)
             date = revision_to_date.get(str(revision), pd.NaT)
-            if not pd.isna(date):
-                date = datetime.datetime.fromtimestamp(date / 1000.0, tz=pytz.utc)
-            data_inner["date"] = date
-            data_inner["time"] = seconds
-            data.append(data_inner)
+            if pd.isna(date):
+                row["date"] = date
+            else:
+                row["date"] = datetime.datetime.fromtimestamp(
+                    date / 1000.0, tz=pytz.utc
+                )
+            row["time"] = seconds
+            data.append(row)
     if len(data) == 0:
         # TODO: Why does this happen?
         return pd.DataFrame()
