@@ -175,7 +175,7 @@ def update_plot(active_cell, derived_viewport_data):
 
     fig = make_subplots(specs=[[{"secondary_y": True}]])
     for column in plot_data:
-        if column == "date":
+        if column in ["date", "is_regression"]:
             continue
         fig.add_trace(
             go.Scatter(
@@ -183,8 +183,20 @@ def update_plot(active_cell, derived_viewport_data):
                 y=plot_data[column],
                 name=column,
             ),
-            secondary_y=column == "is_regression",
         )
+    plot_data = plot_data[plot_data.is_regression]
+    fig.add_trace(
+        go.Scatter(
+            x=plot_data.eval("revision"),
+            y=plot_data["time"],
+            mode="markers",
+            name="Regressions",
+        )
+    )
+    fig.update_traces(
+        marker={"size": 12, "line": {"width": 2, "color": "DarkSlateGrey"}},
+        selector={"mode": "markers"},
+    )
     return fig
 
 
