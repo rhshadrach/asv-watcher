@@ -21,25 +21,27 @@ class Watcher:
     def regressions(self):
         return self._regressions
 
-    def commit_range(self, hash):
-        # TODO: Error checking if hash is here and list is non-empty
-        regression = self.get_regressions(hash)[0]
+    def commit_range(self, git_hash):
+        # TODO: Error checking if git_hash is here and list is non-empty
+        regression = self.get_regressions(git_hash)[0]
         time_series = self._data.loc[regression]
-        prev_hash = time_series.shift(1)[time_series.hash == hash].hash.iloc[0]
+        prev_git_hash = time_series.shift(1)[
+            time_series.git_hash == git_hash
+        ].git_hash.iloc[0]
         base_url = "https://github.com/pandas-dev/pandas/compare/"
-        url = f"{base_url}{prev_hash}...{hash}"
+        url = f"{base_url}{prev_git_hash}...{git_hash}"
         return url
 
-    def get_regressions(self, hash: str) -> list[tuple[str, str]]:
+    def get_regressions(self, git_hash: str) -> list[tuple[str, str]]:
         result = (
-            self._regressions[self._regressions["hash"].eq(hash)]
+            self._regressions[self._regressions["git_hash"].eq(git_hash)]
             .droplevel(["revision"])
             .index.tolist()
         )
         return result
 
-    def generate_report(self, hash: str) -> str:
-        regressions = self.get_regressions(hash)
+    def generate_report(self, git_hash: str) -> str:
+        regressions = self.get_regressions(git_hash)
         for_report: dict[str, list[str]] = {}
         for regression in regressions:
             for_report[regression[0]] = for_report.get(regression[0], []) + [
@@ -79,7 +81,7 @@ class Watcher:
             "\n\n"
         )
 
-        result += self.commit_range(hash)
+        result += self.commit_range(git_hash)
         result += "\n"
 
         return result

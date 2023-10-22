@@ -21,7 +21,7 @@ summary_columns = [
     "abs_change_max",
     "pct_change_mean",
     "abs_change_mean",
-    "hash",
+    "git_hash",
 ]
 print("Startup time:", time.time() - timer)
 
@@ -98,8 +98,8 @@ def update_table(sort_by):
 )
 def update_commit_range(active_cell, derived_viewport_data):
     if active_cell:
-        hash = derived_viewport_data[active_cell["row"]]["hash"]
-        commit_range = watcher.commit_range(hash)
+        git_hash = derived_viewport_data[active_cell["row"]]["git_hash"]
+        commit_range = watcher.commit_range(git_hash)
         result = (html.A("Commit range", href=commit_range),)
         return result
     return ""
@@ -112,8 +112,8 @@ def update_commit_range(active_cell, derived_viewport_data):
 )
 def update_copy_github_comment(active_cell, derived_viewport_data):
     if active_cell:
-        hash = derived_viewport_data[active_cell["row"]]["hash"]
-        result = watcher.generate_report(hash)
+        git_hash = derived_viewport_data[active_cell["row"]]["git_hash"]
+        result = watcher.generate_report(git_hash)
         return result
     return ""
 
@@ -130,9 +130,9 @@ def update_commit_table(active_cell, derived_viewport_data, sort_by):
     if active_cell is None:
         return None
 
-    hash = derived_viewport_data[active_cell["row"]]["hash"]
+    git_hash = derived_viewport_data[active_cell["row"]]["git_hash"]
     regressions = watcher.regressions()
-    result = regressions[regressions["hash"].eq(hash)].reset_index()
+    result = regressions[regressions["git_hash"].eq(git_hash)].reset_index()
 
     if sort_by is not None:
         name = sort_by[0]["column_id"]

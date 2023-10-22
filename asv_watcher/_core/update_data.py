@@ -113,7 +113,7 @@ def process_benchmarks(
                 for k, v in results.items()
             }
         )
-        .rename(columns={"commit_hash": "hash"})
+        .rename(columns={"commit_hash": "git_hash"})
         .droplevel(-1)
     )
     data.index.names = ["name", "params"]
@@ -122,7 +122,7 @@ def process_benchmarks(
     # I think this is due to different dependencies. We should maybe have
     # dependencies as part of the index
     result = data.groupby(["name", "params", "revision"], dropna=False).agg(
-        {"time": "mean", "hash": "first", "date": "first"}
+        {"time": "mean", "git_hash": "first", "date": "first"}
     )
 
     detector = RollingDetector(window_size=window_size)
@@ -143,7 +143,7 @@ def summarize_regressions(benchmarks):
     result = (
         benchmarks[benchmarks.is_regression]
         .reset_index()
-        .groupby("hash", as_index=False)
+        .groupby("git_hash", as_index=False)
         .agg(
             date=("date", "first"),
             benchmarks=("name", "size"),
@@ -153,7 +153,7 @@ def summarize_regressions(benchmarks):
             abs_change_mean_value=("abs_change_value", "mean"),
         )
         .sort_values(by="date", ascending=False)
-        .set_index("hash", drop=False)
+        .set_index("git_hash", drop=False)
     )
     for c in ["pct_change_max", "pct_change_mean"]:
         result[c] = result[f"{c}_value"].apply(lambda x: f"{x:0.3%}")
