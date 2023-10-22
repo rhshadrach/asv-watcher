@@ -1,3 +1,6 @@
+import time
+from pathlib import Path
+
 import dash
 import pandas as pd
 import plotly.graph_objects as go
@@ -5,45 +8,22 @@ from dash import Dash, Input, Output, dash_table, dcc, html
 from plotly.subplots import make_subplots
 
 from asv_watcher import Watcher
-from asv_watcher._core import util
 
+timer = time.time()
 watcher = Watcher()
-summary = watcher.summary()
-summary_by_hash = (
-    summary[summary.is_regression]
-    .reset_index()
-    .groupby("hash", as_index=False)
-    .agg(
-        date=("date", "first"),
-        benchmarks=("name", "size"),
-        pct_change_max=("pct_change", "max"),
-        abs_change_max=("abs_change", "max"),
-        pct_change_mean=("pct_change", "mean"),
-        abs_change_mean=("abs_change", "mean"),
-    )
-    .sort_values(by="date", ascending=False)
-    .set_index("hash", drop=False)[
-        [
-            "date",
-            "benchmarks",
-            "pct_change_max",
-            "abs_change_max",
-            "pct_change_mean",
-            "abs_change_mean",
-            "hash",
-        ]
-    ]
-)
-summary["pct_change"] = summary["pct_change"].apply(lambda x: f"{x:0.3%}")
-for c in ["pct_change_max", "pct_change_mean"]:
-    summary_by_hash[c] = summary_by_hash[c].apply(lambda x: f"{x:0.3%}")
-
-summary["time_float"] = summary["time"]
-summary["time"] = summary["time"].apply(util.time_to_str)
-summary["abs_change"] = summary["abs_change"].apply(util.time_to_str)
-for c in ["abs_change_max", "abs_change_mean"]:
-    summary_by_hash[c] = summary_by_hash[c].apply(util.time_to_str)
-
+cache_path = Path(__file__).parent / ".." / ".cache"
+benchmarks = watcher.benchmarks()
+summary = pd.read_parquet(cache_path / "summary.parquet")
+summary_columns = [
+    "date",
+    "benchmarks",
+    "pct_change_max",
+    "abs_change_max",
+    "pct_change_mean",
+    "abs_change_mean",
+    "hash",
+]
+print("Startup time:", time.time() - timer)
 
 # Initialize the app
 app = Dash(__name__)
@@ -54,9 +34,11 @@ app.layout = html.Div(
         html.Div(children="Regression Navigator"),
         dash_table.DataTable(
             id="summary",
-            data=summary_by_hash.to_dict("records"),
+            data=summary[summary_columns].to_dict("records"),
+            page_current=0,
             page_size=10,
-            sort_action="native",
+            sort_action="custom",
+            sort_mode="single",
         ),
         html.P(id="commit_range"),
         html.Div(
@@ -76,14 +58,37 @@ app.layout = html.Div(
         dash_table.DataTable(
             id="commit_table",
             data=pd.DataFrame().to_dict("records"),
+            page_current=0,
             page_size=10,
-            sort_action="native",
+            sort_action="custom",
+            sort_mode="single",
         ),
         dcc.Graph(id="benchmark_plot", figure={}),
     ]
 )
 
 regressions = []
+
+
+@app.callback(Output("summary", "data"), Input("summary", "sort_by"))
+def update_table(sort_by):
+    if sort_by is not None:
+        name = sort_by[0]["column_id"]
+        if name in [
+            "pct_change_max",
+            "abs_change_max",
+            "pct_change_mean",
+            "abs_change_mean",
+        ]:
+            name += "_value"
+        result = summary.sort_values(
+            name,
+            ascending=sort_by[0]["direction"] == "asc",
+        )
+    else:
+        result = summary
+    result = result[summary_columns]
+    return result.to_dict("records")
 
 
 @app.callback(
@@ -117,20 +122,30 @@ def update_copy_github_comment(active_cell, derived_viewport_data):
     Output("commit_table", "data"),
     Input("summary", "active_cell"),
     Input("summary", "derived_viewport_data"),
+    Input("commit_table", "sort_by"),
 )
-def update_commit_table(active_cell, derived_viewport_data):
+def update_commit_table(active_cell, derived_viewport_data, sort_by):
     global regressions
 
-    if active_cell:
-        hash = derived_viewport_data[active_cell["row"]]["hash"]
-        regressions = watcher.get_regressions(hash)
-        result = (
-            summary[summary["hash"].eq(hash) & summary.is_regression]
-            .reset_index()[["name", "params", "pct_change", "abs_change", "time"]]
-            .to_dict("records")
+    if active_cell is None:
+        return None
+
+    hash = derived_viewport_data[active_cell["row"]]["hash"]
+    regressions = watcher.regressions()
+    result = regressions[regressions["hash"].eq(hash)].reset_index()
+
+    if sort_by is not None:
+        name = sort_by[0]["column_id"]
+        if name in ["pct_change", "abs_change"]:
+            name += "_value"
+        result = result.sort_values(
+            name,
+            ascending=sort_by[0]["direction"] == "asc",
         )
-        return result
-    return None
+
+    return result[["name", "params", "pct_change", "abs_change", "time"]].to_dict(
+        "records"
+    )
 
 
 @app.callback(
@@ -148,15 +163,15 @@ def update_plot(active_cell, derived_viewport_data):
 
     name = derived_viewport_data[active_cell["row"]]["name"]
     params = derived_viewport_data[active_cell["row"]]["params"]
-    plot_data = summary.loc[(name, params)][
+    plot_data = benchmarks.loc[(name, params)][
         [
             "date",
-            "time_float",
+            "time_value",
             "established_best",
             "established_worst",
             "is_regression",
         ]
-    ].rename(columns={"time_float": "time"})
+    ].rename(columns={"time_value": "time"})
 
     fig = make_subplots(specs=[[{"secondary_y": True}]])
     for column in plot_data:

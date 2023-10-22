@@ -12,12 +12,14 @@ class Watcher:
     def __init__(
         self,
     ) -> None:
-        self._data = pd.read_parquet(
-            BASEDIR / ".cache" / "benchmarks.parquet"
-        ).sort_index()
+        self._data = pd.read_parquet(BASEDIR / ".cache" / "benchmarks.parquet")
+        self._regressions = self._data[self._data.is_regression].copy()
 
-    def summary(self):
+    def benchmarks(self):
         return self._data
+
+    def regressions(self):
+        return self._regressions
 
     def commit_range(self, hash):
         # TODO: Error checking if hash is here and list is non-empty
@@ -30,7 +32,7 @@ class Watcher:
 
     def get_regressions(self, hash: str) -> list[tuple[str, str]]:
         result = (
-            self._data[self._data["hash"].eq(hash) & self._data.is_regression]
+            self._regressions[self._regressions["hash"].eq(hash)]
             .droplevel(["revision"])
             .index.tolist()
         )

@@ -13,6 +13,7 @@ import pandas as pd
 import pytz
 
 from asv_watcher import RollingDetector
+from asv_watcher._core import util
 from asv_watcher._core.parameters import ParameterCollection
 
 
@@ -26,16 +27,18 @@ def run(asv_collection_url, write: bool = False, window_size: int = 30) -> pd.Da
 
     benchmark_path = Path(tmpdir.name) / "asv_collection" / "pandas"
     benchmarks = process_benchmarks(benchmark_path, window_size)
+    summary = summarize_regressions(benchmarks)
 
     if write:
         cache_path = Path(__file__).parent / ".." / ".." / ".cache"
-        write_cache(cache_path, benchmarks)
+        write_cache(cache_path, summary, benchmarks)
 
     return benchmarks
 
 
-def write_cache(path: Path, benchmarks: pd.DataFrame) -> None:
+def write_cache(path: Path, summary: pd.DataFrame, benchmarks: pd.DataFrame) -> None:
     os.makedirs(path, exist_ok=True)
+    summary.to_parquet(path / "summary.parquet")
     benchmarks.to_parquet(path / "benchmarks.parquet")
 
 
@@ -125,6 +128,37 @@ def process_benchmarks(
     detector = RollingDetector(window_size=window_size)
     result = detector.detect_regression(result)
 
+    for c in ["pct_change", "abs_change", "time"]:
+        result[f"{c}_value"] = result[c]
+    result["pct_change"] = result["pct_change"].apply(lambda x: f"{x:0.3%}")
+    result["time"] = result["time"].apply(util.time_to_str)
+    result["abs_change"] = result["abs_change"].apply(util.time_to_str)
+
+    result = result.sort_index()
+
+    return result
+
+
+def summarize_regressions(benchmarks):
+    result = (
+        benchmarks[benchmarks.is_regression]
+        .reset_index()
+        .groupby("hash", as_index=False)
+        .agg(
+            date=("date", "first"),
+            benchmarks=("name", "size"),
+            pct_change_max_value=("pct_change_value", "max"),
+            abs_change_max_value=("abs_change_value", "max"),
+            pct_change_mean_value=("pct_change_value", "mean"),
+            abs_change_mean_value=("abs_change_value", "mean"),
+        )
+        .sort_values(by="date", ascending=False)
+        .set_index("hash", drop=False)
+    )
+    for c in ["pct_change_max", "pct_change_mean"]:
+        result[c] = result[f"{c}_value"].apply(lambda x: f"{x:0.3%}")
+    for c in ["abs_change_max", "abs_change_mean"]:
+        result[c] = result[f"{c}_value"].apply(util.time_to_str)
     return result
 
 
