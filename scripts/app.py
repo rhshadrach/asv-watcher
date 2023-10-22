@@ -56,6 +56,7 @@ app.layout = html.Div(
             id="summary",
             data=summary_by_hash.to_dict("records"),
             page_size=10,
+            sort_action="native",
         ),
         html.P(id="commit_range"),
         html.Div(
@@ -72,7 +73,12 @@ app.layout = html.Div(
                 ),
             ]
         ),
-        dash_table.DataTable(id="commit_table", data=pd.DataFrame().to_dict("records")),
+        dash_table.DataTable(
+            id="commit_table",
+            data=pd.DataFrame().to_dict("records"),
+            page_size=10,
+            sort_action="native",
+        ),
         dcc.Graph(id="benchmark_plot", figure={}),
     ]
 )
@@ -80,31 +86,43 @@ app.layout = html.Div(
 regressions = []
 
 
-@app.callback(Output("commit_range", "children"), Input("summary", "active_cell"))
-def update_commit_range(active_cell):
+@app.callback(
+    Output("commit_range", "children"),
+    Input("summary", "active_cell"),
+    Input("summary", "derived_viewport_data"),
+)
+def update_commit_range(active_cell, derived_viewport_data):
     if active_cell:
-        hash = summary_by_hash.index[active_cell["row"]]
+        hash = derived_viewport_data[active_cell["row"]]["hash"]
         commit_range = watcher.commit_range(hash)
         result = (html.A("Commit range", href=commit_range),)
         return result
     return ""
 
 
-@app.callback(Output("copy_github_comment", "content"), Input("summary", "active_cell"))
-def update_copy_github_comment(active_cell):
+@app.callback(
+    Output("copy_github_comment", "content"),
+    Input("summary", "active_cell"),
+    Input("summary", "derived_viewport_data"),
+)
+def update_copy_github_comment(active_cell, derived_viewport_data):
     if active_cell:
-        hash = summary_by_hash.index[active_cell["row"]]
+        hash = derived_viewport_data[active_cell["row"]]["hash"]
         result = watcher.generate_report(hash)
         return result
     return ""
 
 
-@app.callback(Output("commit_table", "data"), Input("summary", "active_cell"))
-def update_commit_table(active_cell):
+@app.callback(
+    Output("commit_table", "data"),
+    Input("summary", "active_cell"),
+    Input("summary", "derived_viewport_data"),
+)
+def update_commit_table(active_cell, derived_viewport_data):
     global regressions
 
     if active_cell:
-        hash = summary_by_hash.index[active_cell["row"]]
+        hash = derived_viewport_data[active_cell["row"]]["hash"]
         regressions = watcher.get_regressions(hash)
         result = (
             summary[summary["hash"].eq(hash) & summary.is_regression]
@@ -115,34 +133,44 @@ def update_commit_table(active_cell):
     return None
 
 
-@app.callback(Output("benchmark_plot", "figure"), Input("commit_table", "active_cell"))
-def update_plot(active_cell):
-    if active_cell is not None and len(regressions) > 0:
-        regression = regressions[active_cell["row"]]
-        plot_data = summary.loc[regression][
-            [
-                "date",
-                "time_float",
-                "established_best",
-                "established_worst",
-                "is_regression",
-            ]
-        ].rename(columns={"time_float": "time"})
+@app.callback(
+    Output("benchmark_plot", "figure"),
+    Input("commit_table", "active_cell"),
+    Input("commit_table", "derived_viewport_data"),
+)
+def update_plot(active_cell, derived_viewport_data):
+    if active_cell is None:
+        return dash.no_update
+    if active_cell["row"] >= len(derived_viewport_data):
+        # When the commit table changes, active_cell["row"] may be stale
+        # and therefore exceed the derived_viewport_data
+        return {}
 
-        fig = make_subplots(specs=[[{"secondary_y": True}]])
-        for column in plot_data:
-            if column == "date":
-                continue
-            fig.add_trace(
-                go.Scatter(
-                    x=plot_data.eval("revision"),
-                    y=plot_data[column],
-                    name=column,
-                ),
-                secondary_y=column == "is_regression",
-            )
-        return fig
-    return dash.no_update
+    name = derived_viewport_data[active_cell["row"]]["name"]
+    params = derived_viewport_data[active_cell["row"]]["params"]
+    plot_data = summary.loc[(name, params)][
+        [
+            "date",
+            "time_float",
+            "established_best",
+            "established_worst",
+            "is_regression",
+        ]
+    ].rename(columns={"time_float": "time"})
+
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
+    for column in plot_data:
+        if column == "date":
+            continue
+        fig.add_trace(
+            go.Scatter(
+                x=plot_data.eval("revision"),
+                y=plot_data[column],
+                name=column,
+            ),
+            secondary_y=column == "is_regression",
+        )
+    return fig
 
 
 if __name__ == "__main__":
