@@ -40,21 +40,6 @@ app.layout = html.Div(
             sort_action="custom",
             sort_mode="single",
         ),
-        html.P(id="commit_range"),
-        html.Div(
-            [
-                html.P("Copy GitHubComment", style={"display": "inline"}),
-                dcc.Clipboard(
-                    id="copy_github_comment",
-                    title="copy",
-                    style={
-                        "display": "inline",
-                        "fontSize": 20,
-                        "verticalAlign": "top",
-                    },
-                ),
-            ]
-        ),
         dash_table.DataTable(
             id="commit_table",
             data=pd.DataFrame().to_dict("records"),
@@ -64,6 +49,38 @@ app.layout = html.Div(
             sort_mode="single",
         ),
         dcc.Graph(id="benchmark_plot", figure={}),
+        html.Div(
+            [
+                html.P(
+                    "GitHub comment", style={"display": "inline", "margin-left": "30px"}
+                ),
+                dcc.Clipboard(
+                    id="copy_github_comment",
+                    title="copy",
+                    style={
+                        "display": "inline",
+                        "fontSize": 20,
+                        "verticalAlign": "top",
+                    },
+                ),
+                html.Div(
+                    children=[
+                        dcc.Markdown(
+                            id="github_comment",
+                            link_target="_blank",
+                        )
+                    ],
+                    style={
+                        "border": "2px black solid",
+                        "border-radius": "25px",
+                        "padding": "0px 30px 0px 30px",
+                        "margin": "auto",
+                        "width": "fit-content",
+                        "align": "center",
+                    },
+                ),
+            ]
+        ),
     ]
 )
 
@@ -92,21 +109,8 @@ def update_table(sort_by):
 
 
 @app.callback(
-    Output("commit_range", "children"),
-    Input("summary", "active_cell"),
-    Input("summary", "derived_viewport_data"),
-)
-def update_commit_range(active_cell, derived_viewport_data):
-    if active_cell:
-        git_hash = derived_viewport_data[active_cell["row"]]["git_hash"]
-        commit_range = watcher.commit_range(git_hash)
-        result = (html.A("Commit range", href=commit_range),)
-        return result
-    return ""
-
-
-@app.callback(
     Output("copy_github_comment", "content"),
+    Output("github_comment", "children"),
     Input("summary", "active_cell"),
     Input("summary", "derived_viewport_data"),
 )
@@ -114,8 +118,8 @@ def update_copy_github_comment(active_cell, derived_viewport_data):
     if active_cell:
         git_hash = derived_viewport_data[active_cell["row"]]["git_hash"]
         result = watcher.generate_report(git_hash)
-        return result
-    return ""
+        return result, result
+    return "", ""
 
 
 @app.callback(
