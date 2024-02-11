@@ -47,8 +47,6 @@ flagged_hashes = list()
 for e in result.split("\t"):
     if e.startswith(needle):
         flagged_hashes.append(e[len(needle) :])
-summary = summary[~summary.git_hash.str[:7].isin(flagged_hashes)]
-
 
 # TODO: Because calling the GH CLI from Juptyer seems to always have color...
 def escape_ansi(line):
@@ -97,6 +95,108 @@ app.layout = html.Div(
                         "margin-left": "30px",
                         "font-size": "20px",
                     },
+                ),
+                html.Div(
+                    dash_table.DataTable(
+                        id="pr_table",
+                        data=pd.DataFrame().to_dict("records"),
+                        page_current=0,
+                        page_size=10,
+                        sort_action="custom",
+                        sort_mode="single",
+                        columns=[
+                            {"id": "Authors", "name": "Authors"},
+                            {"id": "PR", "name": "PR", "presentation": "markdown"},
+                        ],
+                        style_table={"width": "60%", "margin": "auto"},
+                    ),
+                    style={
+                        "width": "100%",
+                        "margin-left": "auto",
+                        "margin-right": "auto",
+                        "margin-bottom": "30px",
+                    },
+                ),
+                html.Div(
+                    [
+                        html.P(
+                            "Title:",
+                            style={
+                                "width": "50px",
+                                "margin-right": "10px",
+                                "display": "inline",
+                            },
+                        ),
+                        dcc.Input(
+                            id="issue_title",
+                            type="text",
+                            size="80",
+                            style={"display": "inline"},
+                        ),
+                    ],
+                    style={"margin-bottom": "30px"},
+                ),
+                html.Div(
+                    [
+                        html.P(
+                            "Body:",
+                            style={
+                                "width": "50px",
+                                "margin-right": "10px",
+                                "display": "inline",
+                                "vertical-align": "top",
+                            },
+                        ),
+                        dcc.Textarea(
+                            id="issue_body",
+                            value="",
+                            style={"width": "60%", "height": 200},
+                        ),
+                    ],
+                    style={"margin-bottom": "30px"},
+                ),
+                html.Div(
+                    [
+                        html.P(
+                            "Labels:",
+                            style={
+                                "width": "50px",
+                                "margin-right": "10px",
+                                "display": "inline",
+                            },
+                        ),
+                        dcc.Dropdown(
+                            id="issue_labels",
+                            options=labels,
+                            multi=True,
+                            style={"width": "900px"},
+                        ),
+                    ],
+                    style={"margin-bottom": "30px"},
+                ),
+                html.Div(
+                    [
+                        html.P(
+                            "Milestone:",
+                            style={
+                                "width": "50px",
+                                "margin-right": "10px",
+                                "display": "inline",
+                            },
+                        ),
+                        dcc.Dropdown(
+                            id="issue_milestone",
+                            options=milestones,
+                            multi=False,
+                            style={"width": "150px"},
+                        ),
+                    ],
+                    style={"margin-bottom": "30px"},
+                ),
+                html.P(
+                    id="gh_cli_cmd",
+                    children="",
+                    style={"display": "none"},
                 ),
                 html.Div(
                     dash_table.DataTable(
@@ -346,7 +446,7 @@ def update_issue_values(pr_cell, pr_table, summary_cell, summary_table):
         authors = pr_table[pr_cell["row"]]["Authors"]
 
         title = f"Potential regression induced by commit {git_hash[:7]}"
-        body = watcher.generate_report_v2(git_hash, pr_number, authors)
+        body = watcher.generate_report(git_hash, pr_number, authors)
         return title, body, ["Performance", "Regression"]
     return "", "", ["Performance", "Regression"]
 
