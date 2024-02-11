@@ -1,10 +1,13 @@
+import json
+import re
+import subprocess
 import time
 from pathlib import Path
 
 import dash
 import pandas as pd
 import plotly.graph_objects as go
-from dash import Dash, Input, Output, dash_table, dcc, html
+from dash import Dash, Input, Output, State, dash_table, dcc, html
 from plotly.subplots import make_subplots
 
 from asv_watcher import Watcher
@@ -27,6 +30,31 @@ print("Startup time:", time.time() - timer)
 
 # Initialize the app
 app = Dash(__name__)
+
+
+def execute(cmd):
+    response = subprocess.run(cmd, shell=True, capture_output=True)
+    if response.stderr.decode() != "":
+        raise ValueError(response.stderr.decode())
+    return response.stdout.decode()
+
+
+# TODO: Because calling the GH CLI from Juptyer seems to always have color...
+def escape_ansi(line):
+    ansi_escape = re.compile(r"(?:\x1B[@-_]|[\x80-\x9F])[0-?]*[ -/]*[@-~]")
+    return ansi_escape.sub("", line)
+
+
+response = execute(
+    "cd /home/richard/dev/pandas/ && NO_COLOR=1 gh label list --limit 200 --json name"
+)
+labels = [e["name"] for e in json.loads(escape_ansi(response))]
+
+response = execute(
+    "cd /home/richard/dev/pandas/ "
+    "&& gh api repos/:owner/:repo/milestones --jq '.[].title'"
+)
+milestones = [e for e in response.split("\n") if e != ""]
 
 # App layout
 app.layout = html.Div(
@@ -52,16 +80,54 @@ app.layout = html.Div(
         html.Div(
             [
                 html.P(
-                    "GitHub comment", style={"display": "inline", "margin-left": "30px"}
+                    "Suspect Commits",
+                    style={"display": "inline", "margin-left": "30px"},
                 ),
-                dcc.Clipboard(
-                    id="copy_github_comment",
-                    title="copy",
-                    style={
-                        "display": "inline",
-                        "fontSize": 20,
-                        "verticalAlign": "top",
-                    },
+                dash_table.DataTable(
+                    id="pr_table",
+                    data=pd.DataFrame().to_dict("records"),
+                    page_current=0,
+                    page_size=10,
+                    sort_action="custom",
+                    sort_mode="single",
+                    columns=[
+                        {"id": "Authors", "name": "Authors"},
+                        {"id": "PR", "name": "PR", "presentation": "markdown"},
+                    ],
+                    style_table={"width": "60%"},
+                ),
+                html.Div(
+                    dcc.Input(
+                        id="issue_title",
+                        type="text",
+                        size="80",
+                    ),
+                ),
+                html.Div(
+                    dcc.Textarea(
+                        id="issue_body",
+                        value="",
+                        style={"width": "60%", "height": 200},
+                    ),
+                ),
+                html.Div(
+                    dcc.Dropdown(
+                        id="issue_labels",
+                        options=labels,
+                        multi=True,
+                    ),
+                ),
+                html.Div(
+                    dcc.Dropdown(
+                        id="issue_milestone",
+                        options=milestones,
+                        multi=False,
+                    ),
+                ),
+                html.P(
+                    id="gh_cli_cmd",
+                    children="",
+                    style={"display": "none"},
                 ),
                 html.Div(
                     children=[
@@ -79,7 +145,18 @@ app.layout = html.Div(
                         "align": "center",
                     },
                 ),
+                html.Div(
+                    html.Button(
+                        "Create GitHub Issue",
+                        id="issue_generate",
+                        n_clicks=0,
+                    ),
+                ),
             ]
+        ),
+        dcc.ConfirmDialog(
+            id="issue_confirm",
+            message="Are you sure you want to create an issue?",
         ),
     ]
 )
@@ -109,17 +186,135 @@ def update_table(sort_by):
 
 
 @app.callback(
-    Output("copy_github_comment", "content"),
     Output("github_comment", "children"),
+    Input("issue_body", "value"),
+)
+def update_copy_github_comment(issue_body):
+    return issue_body
+
+
+@app.callback(
+    Output("pr_table", "data"),
     Input("summary", "active_cell"),
     Input("summary", "derived_viewport_data"),
 )
-def update_copy_github_comment(active_cell, derived_viewport_data):
+def update_pr_table(active_cell, derived_viewport_data):
     if active_cell:
         git_hash = derived_viewport_data[active_cell["row"]]["git_hash"]
-        result = watcher.generate_report(git_hash)
-        return result, result
+        commit_range = watcher.commit_range(git_hash)
+        response = execute(
+            f"cd /home/richard/dev/pandas"
+            f" && git rev-list --ancestry-path {commit_range}"
+        )
+        commits = [e for e in response.split("\n") if e != ""]
+
+        data = []
+        for commit in commits:
+            response = execute(
+                f"cd /home/richard/dev/pandas"
+                f" && gh pr list"
+                f'    --search "{commit}"'
+                f"    --state merged"
+                f"    --json title,number,author"
+            )
+            titles = [e["title"] for e in json.loads(escape_ansi(response))]
+            numbers = [e["number"] for e in json.loads(escape_ansi(response))]
+            authors = [e["author"] for e in json.loads(escape_ansi(response))]
+            authors = [e for e in authors if not e["is_bot"]]
+            authors = [e["login"] for e in authors]
+            assert len(titles) == 1 and len(numbers) == 1
+            repo_url = "https://github.com/pandas-dev/pandas"
+            data.append(
+                {
+                    "Authors": ", ".join(authors),
+                    "PR": f"[{titles[0]}]({repo_url}/pull/{numbers[0]})",
+                }
+            )
+        return pd.DataFrame(data).to_dict("records")
+    return pd.DataFrame().to_dict("records")
+
+
+@app.callback(
+    Output("issue_title", "value"),
+    Output("issue_body", "value"),
+    Output("issue_labels", "value"),
+    Input("pr_table", "active_cell"),
+    State("pr_table", "derived_viewport_data"),
+    State("summary", "active_cell"),
+    State("summary", "derived_viewport_data"),
+    prevent_initial_call=True,
+)
+def update_issue_values(pr_cell, pr_table, summary_cell, summary_table):
+    if pr_cell and summary_cell:
+        git_hash = summary_table[summary_cell["row"]]["git_hash"]
+
+        pr_link = pr_table[pr_cell["row"]]["PR"]
+        idx = pr_link.rfind("/pull/")
+        pr_number = pr_link[idx + len("/pull/") : -1]
+
+        authors = pr_table[pr_cell["row"]]["Authors"]
+
+        title = f"Potential regression induced by PR #{pr_number}"
+        body = watcher.generate_report_v2(git_hash, pr_number, authors)
+        return title, body, ["Performance", "Regression"]
     return "", ""
+
+
+@app.callback(
+    Output("gh_cli_cmd", "children"),
+    Input("issue_title", "value"),
+    Input("issue_body", "value"),
+    Input("issue_labels", "value"),
+    Input("issue_milestone", "value"),
+    prevent_initial_call=True,
+)
+def update_gh_cli_cmd(issue_title, issue_body, issue_labels, issue_milestone):
+    if not all(label in labels for label in issue_labels):
+        return ""
+    if issue_milestone not in milestones:
+        return ""
+    issue_labels = ",".join(issue_labels)
+    assert '"' not in issue_title, issue_title
+    assert '"' not in issue_body, issue_body
+    assert '"' not in issue_labels, issue_labels
+    assert '"' not in issue_milestone, issue_milestone
+    result = (
+        f"gh issue create"
+        rf' --title "{issue_title}"'
+        rf' --body "{issue_body}"'
+        rf' --label "{issue_labels}"'
+        rf' --milestone "{issue_milestone}"'
+    )
+    return result
+
+
+@app.callback(
+    Output("gh_cli_cmd", "children", allow_duplicate=True),
+    Input("issue_confirm", "submit_n_clicks"),
+    State("gh_cli_cmd", "children"),
+    prevent_initial_call=True,
+    allow_duplicate=True,
+)
+def generate_issue(submit_n_clicks, gh_cli_cmd):
+    if gh_cli_cmd == "":
+        return gh_cli_cmd
+    execute(f"cd /home/richard/dev/pandas && {repr(gh_cli_cmd)}")
+    # Hack because dash doesn't seem to let you have no output...
+    return gh_cli_cmd
+
+
+@app.callback(
+    Output("issue_confirm", "message"),
+    Output("issue_confirm", "displayed"),
+    Input("issue_generate", "n_clicks"),
+    State("gh_cli_cmd", "children"),
+    prevent_initial_call=True,
+)
+def display_confirm(n_clicks, gh_cli_cmd):
+    if gh_cli_cmd == "":
+        return "", False
+    message = f"Are you sure you want to create the following issue?\n\n{gh_cli_cmd}"
+    return message, True
 
 
 @app.callback(
@@ -147,9 +342,9 @@ def update_commit_table(active_cell, derived_viewport_data, sort_by):
             ascending=sort_by[0]["direction"] == "asc",
         )
 
-    return result[["name", "params", "pct_change", "abs_change", "time"]].to_dict(
-        "records"
-    )
+    return result[
+        ["name", "params", "pct_change", "abs_change", "time", "revision"]
+    ].to_dict("records")
 
 
 @app.callback(
@@ -167,34 +362,42 @@ def update_plot(active_cell, derived_viewport_data):
 
     name = derived_viewport_data[active_cell["row"]]["name"]
     params = derived_viewport_data[active_cell["row"]]["params"]
-    plot_data = benchmarks.loc[(name, params)][
-        [
-            "date",
-            "time_value",
-            "established_best",
-            "established_worst",
-            "is_regression",
-        ]
-    ].rename(columns={"time_value": "time"})
+    columns = [
+        "revision",
+        "date",
+        "time",
+        "established_best",
+        "established_worst",
+        "is_regression",
+    ]
+    plot_data = (
+        benchmarks.loc[(name, params)]
+        .drop(columns="time")
+        .rename(columns={"time_value": "time"})
+        .reset_index()[columns]
+    )
 
     fig = make_subplots(specs=[[{"secondary_y": True}]])
     for column in plot_data:
-        if column in ["date", "is_regression"]:
+        if column in ["date", "is_regression", "revision"]:
             continue
         fig.add_trace(
             go.Scatter(
-                x=plot_data.eval("revision"),
+                x=plot_data.index,
                 y=plot_data[column],
                 name=column,
             ),
         )
     plot_data = plot_data[plot_data.is_regression]
+
     fig.add_trace(
         go.Scatter(
-            x=plot_data.eval("revision"),
+            x=plot_data.index,
             y=plot_data["time"],
             mode="markers",
             name="Regressions",
+            hovertext=plot_data["date"].astype(str).tolist(),
+            hoverinfo="text",
         )
     )
     fig.update_traces(
