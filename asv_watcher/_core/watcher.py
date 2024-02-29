@@ -109,7 +109,7 @@ class Watcher:
         for benchmark, param_combos in for_report.items():
             base_url = "https://asv-runner.github.io/asv-collection/pandas/#"
             url = f"{base_url}{benchmark}"
-            result += f" - [{benchmark}]({url})\n"
+            result += f" - [ ] [{benchmark}]({url})\n"
             for params in param_combos:
                 if params == "":
                     continue
@@ -117,7 +117,7 @@ class Watcher:
                 params_suffix = "?p-" + "&p-".join(params_list)
                 url = f"{base_url}{benchmark}{params_suffix}"
                 url = urllib.parse.quote(url, safe="/:?=&#")
-                result += f"   - [{params}]({url})\n"
+                result += f"   - [ ] [{params}]({url})\n"
         result += "\n"
 
         result += (
@@ -128,7 +128,7 @@ class Watcher:
         )
 
         base_url = "https://github.com/pandas-dev/pandas/compare/"
-        result += base_url + self.commit_range(git_hash)
+        result += f"[Commit Range]({base_url + self.commit_range(git_hash)})"
         result += "\n\n"
         result += "cc @" + ", @".join(authors.split(", ")) + "\n"
 

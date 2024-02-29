@@ -39,6 +39,17 @@ def execute(cmd):
     return response.stdout.decode()
 
 
+# Exclude any hashes that already have an issue
+needle = "Potential regression induced by commit "
+cmd = f'gh search issues "{needle}"'
+result = execute(cmd)
+flagged_hashes = list()
+for e in result.split("\t"):
+    if e.startswith(needle):
+        flagged_hashes.append(e[len(needle) :])
+summary = summary[~summary.git_hash.str[:7].isin(flagged_hashes)]
+
+
 # TODO: Because calling the GH CLI from Juptyer seems to always have color...
 def escape_ansi(line):
     ansi_escape = re.compile(r"(?:\x1B[@-_]|[\x80-\x9F])[0-?]*[ -/]*[@-~]")
@@ -81,48 +92,108 @@ app.layout = html.Div(
             [
                 html.P(
                     "Suspect Commits",
-                    style={"display": "inline", "margin-left": "30px"},
+                    style={
+                        "display": "inline",
+                        "margin-left": "30px",
+                        "font-size": "20px",
+                    },
                 ),
-                dash_table.DataTable(
-                    id="pr_table",
-                    data=pd.DataFrame().to_dict("records"),
-                    page_current=0,
-                    page_size=10,
-                    sort_action="custom",
-                    sort_mode="single",
-                    columns=[
-                        {"id": "Authors", "name": "Authors"},
-                        {"id": "PR", "name": "PR", "presentation": "markdown"},
+                html.Div(
+                    dash_table.DataTable(
+                        id="pr_table",
+                        data=pd.DataFrame().to_dict("records"),
+                        page_current=0,
+                        page_size=10,
+                        sort_action="custom",
+                        sort_mode="single",
+                        columns=[
+                            {"id": "Authors", "name": "Authors"},
+                            {"id": "PR", "name": "PR", "presentation": "markdown"},
+                        ],
+                        style_table={"width": "60%", "margin": "auto"},
+                    ),
+                    style={
+                        "width": "100%",
+                        "margin-left": "auto",
+                        "margin-right": "auto",
+                        "margin-bottom": "30px",
+                    },
+                ),
+                html.Div(
+                    [
+                        html.P(
+                            "Title:",
+                            style={
+                                "width": "50px",
+                                "margin-right": "10px",
+                                "display": "inline",
+                            },
+                        ),
+                        dcc.Input(
+                            id="issue_title",
+                            type="text",
+                            size="80",
+                            style={"display": "inline"},
+                        ),
                     ],
-                    style_table={"width": "60%"},
+                    style={"margin-bottom": "30px"},
                 ),
                 html.Div(
-                    dcc.Input(
-                        id="issue_title",
-                        type="text",
-                        size="80",
-                    ),
+                    [
+                        html.P(
+                            "Body:",
+                            style={
+                                "width": "50px",
+                                "margin-right": "10px",
+                                "display": "inline",
+                                "vertical-align": "top",
+                            },
+                        ),
+                        dcc.Textarea(
+                            id="issue_body",
+                            value="",
+                            style={"width": "60%", "height": 200},
+                        ),
+                    ],
+                    style={"margin-bottom": "30px"},
                 ),
                 html.Div(
-                    dcc.Textarea(
-                        id="issue_body",
-                        value="",
-                        style={"width": "60%", "height": 200},
-                    ),
+                    [
+                        html.P(
+                            "Labels:",
+                            style={
+                                "width": "50px",
+                                "margin-right": "10px",
+                                "display": "inline",
+                            },
+                        ),
+                        dcc.Dropdown(
+                            id="issue_labels",
+                            options=labels,
+                            multi=True,
+                            style={"width": "900px"},
+                        ),
+                    ],
+                    style={"margin-bottom": "30px"},
                 ),
                 html.Div(
-                    dcc.Dropdown(
-                        id="issue_labels",
-                        options=labels,
-                        multi=True,
-                    ),
-                ),
-                html.Div(
-                    dcc.Dropdown(
-                        id="issue_milestone",
-                        options=milestones,
-                        multi=False,
-                    ),
+                    [
+                        html.P(
+                            "Milestone:",
+                            style={
+                                "width": "50px",
+                                "margin-right": "10px",
+                                "display": "inline",
+                            },
+                        ),
+                        dcc.Dropdown(
+                            id="issue_milestone",
+                            options=milestones,
+                            multi=False,
+                            style={"width": "150px"},
+                        ),
+                    ],
+                    style={"margin-bottom": "30px"},
                 ),
                 html.P(
                     id="gh_cli_cmd",
@@ -131,26 +202,45 @@ app.layout = html.Div(
                 ),
                 html.Div(
                     children=[
-                        dcc.Markdown(
-                            id="github_comment",
-                            link_target="_blank",
-                        )
+                        html.Div(
+                            children=[
+                                dcc.Markdown(
+                                    id="github_comment",
+                                    link_target="_blank",
+                                )
+                            ],
+                            style={
+                                "border": "2px black solid",
+                                "border-radius": "25px",
+                                "padding": "0px 30px 0px 30px",
+                                "width": "50%",
+                                "float": "left",
+                                "display": "flex",
+                                "align-items": "center",
+                                "justify-content": "center",
+                            },
+                        ),
+                        html.Div(
+                            html.Button(
+                                "Create GitHub Issue",
+                                id="issue_generate",
+                                n_clicks=0,
+                            ),
+                            style={
+                                "width": "50%",
+                                "float": "right",
+                                "display": "flex",
+                                "align-items": "center",
+                                "justify-content": "center",
+                            },
+                        ),
                     ],
                     style={
-                        "border": "2px black solid",
-                        "border-radius": "25px",
-                        "padding": "0px 30px 0px 30px",
-                        "margin": "auto",
-                        "width": "fit-content",
-                        "align": "center",
+                        "display": "flex",
+                        "width": "80%",
+                        "align-items": "center",
+                        "justify-content": "center",
                     },
-                ),
-                html.Div(
-                    html.Button(
-                        "Create GitHub Issue",
-                        id="issue_generate",
-                        n_clicks=0,
-                    ),
                 ),
             ]
         ),
@@ -213,7 +303,7 @@ def update_pr_table(active_cell, derived_viewport_data):
             response = execute(
                 f"cd /home/richard/dev/pandas"
                 f" && gh pr list"
-                f'    --search "{commit}"'
+                f'    --search "{commit[:7]}"'
                 f"    --state merged"
                 f"    --json title,number,author"
             )
@@ -222,7 +312,8 @@ def update_pr_table(active_cell, derived_viewport_data):
             authors = [e["author"] for e in json.loads(escape_ansi(response))]
             authors = [e for e in authors if not e["is_bot"]]
             authors = [e["login"] for e in authors]
-            assert len(titles) == 1 and len(numbers) == 1
+            assert len(titles) == 1, titles
+            assert len(numbers) == 1, numbers
             repo_url = "https://github.com/pandas-dev/pandas"
             data.append(
                 {
@@ -254,10 +345,10 @@ def update_issue_values(pr_cell, pr_table, summary_cell, summary_table):
 
         authors = pr_table[pr_cell["row"]]["Authors"]
 
-        title = f"Potential regression induced by PR #{pr_number}"
+        title = f"Potential regression induced by commit {git_hash[:7]}"
         body = watcher.generate_report_v2(git_hash, pr_number, authors)
         return title, body, ["Performance", "Regression"]
-    return "", ""
+    return "", "", ["Performance", "Regression"]
 
 
 @app.callback(
@@ -298,7 +389,7 @@ def update_gh_cli_cmd(issue_title, issue_body, issue_labels, issue_milestone):
 def generate_issue(submit_n_clicks, gh_cli_cmd):
     if gh_cli_cmd == "":
         return gh_cli_cmd
-    execute(f"cd /home/richard/dev/pandas && {repr(gh_cli_cmd)}")
+    execute(f"cd /home/richard/dev/pandas && {gh_cli_cmd}")
     # Hack because dash doesn't seem to let you have no output...
     return gh_cli_cmd
 
@@ -386,6 +477,7 @@ def update_plot(active_cell, derived_viewport_data):
                 x=plot_data.index,
                 y=plot_data[column],
                 name=column,
+                visible=column in ["time"],
             ),
         )
     plot_data = plot_data[plot_data.is_regression]
