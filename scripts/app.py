@@ -47,7 +47,6 @@ flagged_hashes = list()
 for e in result.split("\t"):
     if e.startswith(needle):
         flagged_hashes.append(e[len(needle) :])
-summary = summary[~summary.git_hash.str[:7].isin(flagged_hashes)]
 
 
 # TODO: Because calling the GH CLI from Juptyer seems to always have color...
@@ -346,7 +345,7 @@ def update_issue_values(pr_cell, pr_table, summary_cell, summary_table):
         authors = pr_table[pr_cell["row"]]["Authors"]
 
         title = f"Potential regression induced by commit {git_hash[:7]}"
-        body = watcher.generate_report_v2(git_hash, pr_number, authors)
+        body = watcher.generate_report(git_hash, pr_number, authors)
         return title, body, ["Performance", "Regression"]
     return "", "", ["Performance", "Regression"]
 
