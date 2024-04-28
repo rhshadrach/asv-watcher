@@ -1,8 +1,4 @@
-import os
-from pathlib import Path
-
 import pandas as pd
-import pytest
 
 from asv_watcher import Watcher
 
@@ -15,7 +11,7 @@ def test_commit_range():
             "params": "",
             "revision": [0, 1, 2],
             "git_hash": ["a0", "a1", "a2"],
-            "is_regression": [True, False, True]
+            "is_regression": [True, False, True],
         }
     ).set_index(["name", "params", "revision"])
     watcher._regressions = watcher._data[watcher._data.is_regression]
