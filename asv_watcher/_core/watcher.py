@@ -13,7 +13,7 @@ class Watcher:
         self,
     ) -> None:
         self._data = pd.read_parquet(BASEDIR / ".cache" / "benchmarks.parquet")
-        self._regressions = self._data[self._data.is_regression].copy()
+        self._regressions = self._data[self._data.is_regression]
 
     def benchmarks(self):
         return self._data
@@ -21,25 +21,43 @@ class Watcher:
     def regressions(self):
         return self._regressions
 
-    def commit_range(self, git_hash):
-        # TODO: Error checking if git_hash is here and list is non-empty
-        regression = self.get_regressions(git_hash)[0]
-        time_series = self._data.loc[regression]
-        prev_git_hash = time_series.shift(1)[
-            time_series.git_hash == git_hash
-        ].git_hash.iloc[0]
-        url = f"{prev_git_hash}...{git_hash}"
-        return url
+    def commit_range(self, git_hash: str) -> str:
+        """Get commit range between a hash and the previous hash that has a benchmark.
 
-    def get_regressions(self, git_hash: str) -> list[tuple[str, str]]:
-        result = (
+        Args:
+            git_hash: Hash of a commit. This must be from a commit that has a
+                regression.
+
+        Returns:
+            The commit range in the form of "{prev_git_hash}...{git_hash}" from the
+            previous commit that has a benchmark to the provided git_hash.
+        """
+        # TODO: Error checking if git_hash is here and list is non-empty
+        # We're interested in the hashes, so just grab a single benchmark to get
+        # the time series.
+        benchmark = (
             self._regressions[self._regressions["git_hash"].eq(git_hash)]
             .droplevel(["revision"])
             .index.tolist()
-        )
+        )[0]
+        time_series = self._data.loc[benchmark]
+        prev_git_hash = time_series.shift(1)[
+            time_series.git_hash == git_hash
+        ].git_hash.iloc[0]
+        result = f"{prev_git_hash}...{git_hash}"
         return result
 
     def generate_report(self, git_hash: str, pr: str, authors: str) -> str:
+        """Generate a regression report.
+
+        Args:
+            git_hash: git hash of the commit with a regression.
+            pr: PR number of the commit.
+            authors: List of authors in the form "author1, author2, ...".
+
+        Returns:
+            A detailed regression report.
+        """
         regressions = self.regressions()
         regressions = regressions[regressions["git_hash"].eq(git_hash)]
 
