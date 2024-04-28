@@ -40,12 +40,9 @@ class Watcher:
         return result
 
     def generate_report(self, git_hash: str) -> str:
-        regressions = self.get_regressions(git_hash)
-        for_report: dict[str, list[str]] = {}
-        for regression in regressions:
-            for_report[regression[0]] = for_report.get(regression[0], []) + [
-                regression[1]
-            ]
+        # regressions = self.get_regressions(git_hash)
+        regressions = self.regressions()
+        regressions = regressions[regressions["git_hash"].eq(git_hash)].reset_index()
 
         result = ""
         result += (
@@ -59,10 +56,12 @@ class Watcher:
             "\n\n"
         )
 
-        for benchmark, param_combos in for_report.items():
+        for idx, regression in regressions.iterrows():
+            benchmark, param_combos = idx[0], idx[1]
             base_url = "https://asv-runner.github.io/asv-collection/pandas/#"
             url = f"{base_url}{benchmark}"
             result += f" - [{benchmark}]({url})\n"
+            print(param_combos)
             for params in param_combos:
                 if params == "":
                     continue
@@ -87,12 +86,14 @@ class Watcher:
         return result
 
     def generate_report_v2(self, git_hash: str, pr: str, authors: str) -> str:
-        regressions = self.get_regressions(git_hash)
-        for_report: dict[str, list[str]] = {}
-        for regression in regressions:
-            for_report[regression[0]] = for_report.get(regression[0], []) + [
-                regression[1]
-            ]
+        # regressions = self.get_regressions(git_hash)
+        regressions = self.regressions()
+        regressions = regressions[regressions["git_hash"].eq(git_hash)]
+        # for_report: dict[str, list[str]] = {}
+        # for regression in regressions:
+        #     for_report[regression[0]] = for_report.get(regression[0], []) + [
+        #         regression[1]
+        #     ]
 
         result = ""
         result += (
@@ -106,18 +107,22 @@ class Watcher:
             "\n\n"
         )
 
-        for benchmark, param_combos in for_report.items():
+        for idx, regression in regressions.iterrows():
+            benchmark, params = idx[0], idx[1]
             base_url = "https://asv-runner.github.io/asv-collection/pandas/#"
             url = f"{base_url}{benchmark}"
-            result += f" - [ ] [{benchmark}]({url})\n"
-            for params in param_combos:
-                if params == "":
-                    continue
-                params_list = [param for param in params.split("; ")]
-                params_suffix = "?p-" + "&p-".join(params_list)
-                url = f"{base_url}{benchmark}{params_suffix}"
-                url = urllib.parse.quote(url, safe="/:?=&#")
-                result += f"   - [ ] [{params}]({url})\n"
+            severity = f"{regression['pct_change']} ({regression['abs_change']})"
+            result += f" - [ ] [{benchmark}]({url})"
+            print(params)
+            if params == "":
+                result += f" - {severity}\n"
+                continue
+            result += "\n"
+            params_list = [param for param in params.split("; ")]
+            params_suffix = "?p-" + "&p-".join(params_list)
+            url = f"{base_url}{benchmark}{params_suffix}"
+            url = urllib.parse.quote(url, safe="/:?=&#")
+            result += f"   - [ ] [{params}]({url}) - {severity}\n"
         result += "\n"
 
         result += (

@@ -47,7 +47,7 @@ flagged_hashes = list()
 for e in result.split("\t"):
     if e.startswith(needle):
         flagged_hashes.append(e[len(needle) :])
-summary = summary[~summary.git_hash.str[:7].isin(flagged_hashes)]
+# summary = summary[~summary.git_hash.str[:7].isin(flagged_hashes)]
 
 
 # TODO: Because calling the GH CLI from Juptyer seems to always have color...
